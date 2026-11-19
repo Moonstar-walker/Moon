@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>中侨校园一日闯关 · Vibe Coding Demo</title>
+<style>
+  /* ===== 全局：深绿 + 紫色校园风 ===== */
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
+    background: linear-gradient(160deg, #0d3b2e 0%, #14523f 45%, #2a1a4a 100%);
+    min-height: 100vh;
+    color: #f0f5f1;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    padding: 32px 16px;
+  }
+  .game-card {
+    width: 100%;
+    max-width: 640px;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(167,139,250,0.35);
+    border-radius: 18px;
+    box-shadow: 0 12px 40px rgba(0,0,0,0.45);
+    overflow: hidden;
+    backdrop-filter: blur(6px);
+  }
+  /* ===== 顶部状态栏 ===== */
+  .topbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 24px;
+    background: rgba(13,59,46,0.85);
+    border-bottom: 2px solid #a78bfa;
+  }
+  .topbar h1 { font-size: 18px; letter-spacing: 2px; color: #c4b5fd; }
+  .score { font-size: 16px; font-weight: bold; color: #ffd97d; }
+  .btn-restart {
+    background: transparent;
+    border: 1px solid #a78bfa;
+    color: #c4b5fd;
+    padding: 6px 14px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 13px;
+    transition: 0.2s;
+  }
+  .btn-restart:hover { background: #a78bfa; color: #0d3b2e; }
+
+  /* ===== 剧情区域 ===== */
+  .story {
+    padding: 32px 28px;
+    min-height: 380px;
+    display: flex;
+    flex-direction: column;
+    gap: 22px;
+  }
+  .scene-tag {
+    display: inline-block;
+    align-self: flex-start;
+    background: #a78bfa;
+    color: #0d3b2e;
+    font-size: 13px;
+    font-weight: bold;
+    padding: 4px 12px;
+    border-radius: 999px;
+  }
+  .scene-text {
+    font-size: 16px;
+    line-height: 1.9;
+    color: #e8f0ea;
+    white-space: pre-line;
+  }
+  .scene-feedback {
+    font-size: 14px;
+    line-height: 1.7;
+    color: #ffd97d;
+    background: rgba(255,217,125,0.08);
+    border-left: 3px solid #ffd97d;
+    padding: 10px 14px;
+    border-radius: 6px;
+  }
+  /* ===== 选项按钮 ===== */
+  .choices { display: flex; flex-direction: column; gap: 12px; margin-top: auto; }
+  .choice {
+    text-align: left;
+    background: rgba(20,82,63,0.75);
+    border: 1px solid #34d399;
+    color: #e8f0ea;
+    font-size: 15px;
+    padding: 14px 18px;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: 0.18s;
+  }
+  .choice:hover {
+    background: #a78bfa;
+    border-color: #a78bfa;
+    color: #0d3b2e;
+    transform: translateX(4px);
+  }
+  /* ===== 结局页 ===== */
+  .ending { text-align: center; align-items: center; }
+  .ending h2 { font-size: 28px; color: #c4b5fd; letter-spacing: 4px; }
+  .ending .final-score { font-size: 40px; color: #ffd97d; font-weight: bold; margin: 8px 0; }
+  .ending .rank { font-size: 20px; color: #34d399; }
+  .hidden { display: none; }
+</style>
+</head>
+<body>
+
+<div class="game-card">
+  <div class="topbar">
+    <h1>中侨校园一日闯关</h1>
+    <div class="score">得分：<span id="score">0</span></div>
+    <button class="btn-restart" onclick="restart()">重新开始</button>
+  </div>
+  <div class="story">
+    <span class="scene-tag" id="sceneTag"></span>
+    <div class="scene-text" id="sceneText"></div>
+    <div class="scene-feedback hidden" id="sceneFeedback"></div>
+    <div class="choices" id="choices"></div>
+  </div>
+</div>
+
+<script>
+/* ================= 剧情数据 ================= */
+/* 每个节点：tag 场景标签 / text 剧情 / feedback 选项结果提示 / choices 选项数组
+   选项：text 按钮文字 / score 分值变化 / next 下一节点（"win" 表示通关） */
+const scenes = {
+  start: {
+    tag: "序章 · 清晨 8:15",
+    text: "周一早晨，阳光洒进宿舍。\n你猛地睁眼——早八的《人工智能导论》还有 20 分钟开始！\n室友已经不见了，桌上放着半块面包。",
+    choices: [
+      { text: "抓起面包冲向教室，路上边跑边吃", score: 10, next: "level1" },
+      { text: "从容洗漱，缺席早八也无所谓", score: -5, next: "fail1a" },
+      { text: "给老师发消息请假，继续睡回笼觉", score: -10, next: "fail1b" }
+    ]
+  },
+  fail1a: {
+    tag: "序章 · 翻车",
+    text: "你躺回床上，一觉睡到中午。\n醒来看到群里老师在 @你：缺勤记录已记下，下周约谈。",
+    feedback: "小失败！请重新做出选择。",
+    choices: [ { text: "回到清晨，重新来过", score: 0, next: "start" } ]
+  },
+  fail1b: {
+    tag: "序章 · 翻车",
+    text: "老师回复：\"AI 导论不支持线上请假哦，同学请到教室。\"\n你的睡意瞬间消失，尴尬值拉满。",
+    feedback: "小失败！请重新做出选择。",
+    choices: [ { text: "回到清晨，重新来过", score: 0, next: "start" } ]
+  },
+
+  level1: {
+    tag: "第一关 · 早八危机",
+    text: "你准时冲进教室，气喘吁吁。\n老师说：\"今天随机点名回答：AI 最典型的应用场景是什么？\"\n前排学霸举手如林，你的心跳到了嗓子眼。",
+    choices: [
+      { text: "举手回答：图像识别与自然语言处理", score: 20, next: "level2" },
+      { text: "低头装作翻书，祈祷不被点到", score: 0, next: "level2" },
+      { text: "大喊\"让 AI 自己回答！\"逗笑全班", score: -5, next: "level2" }
+    ]
+  },
+
+  level2: {
+    tag: "第二关 · 图书馆之谜",
+    text: "午后来到图书馆，你发现唯一的空位上放着\n一本没人认领的《数据结构》和一个保温杯。\n旁边同学小声说：\"这人去吃饭了，快两小时了……\"",
+    choices: [
+      { text: "帮忙把书和杯子收好，写在失物招领板上", score: 20, next: "level3" },
+      { text: "直接坐下，把东西推到一边", score: -10, next: "fail2" },
+      { text: "原地等主人回来，顺便翻自己的笔记复习", score: 15, next: "level3" }
+    ]
+  },
+  fail2: {
+    tag: "第二关 · 尴尬时刻",
+    text: "你刚坐下十分钟，主人回来了，场面一度十分尴尬。\n管理员也走过来提醒：\"占座物品不能随意移动哦。\"",
+    feedback: "小失败！请重新做出选择。",
+    choices: [ { text: "回到图书馆，重新选择", score: 0, next: "level2" } ]
+  },
+
+  level3: {
+    tag: "第三关 · 社团招新夜",
+    text: "傍晚，操场上社团招新灯火通明。\nAI 社和篮球社同时向你招手，时间只够报一个。\nAI 社学长说：\"我们正在做 Vibe Coding 黑客松项目！\"",
+    choices: [
+      { text: "加入 AI 社，用代码点亮校园", score: 25, next: "win" },
+      { text: "加入篮球社，挥洒汗水也很酷", score: 15, next: "win" },
+      { text: "两个都观望，最后一个也没报", score: -15, next: "fail3" }
+    ]
+  },
+  fail3: {
+    tag: "第三关 · 犹豫的代价",
+    text: "你在两个摊位之间来回踱步，招新结束了。\n学长拍了拍你的肩：\"下次果断一点！\"",
+    feedback: "小失败！请重新做出选择。",
+    choices: [ { text: "回到招新夜，重新选择", score: 0, next: "level3" } ]
+  },
+
+  /* ===== 通关胜利页 ===== */
+  win: {
+    tag: "通关 · 胜利",
+    text: "",
+    choices: []
+  }
+};
+
+/* ================= 游戏逻辑 ================= */
+let score = 0;
+const el = {
+  score: document.getElementById("score"),
+  tag: document.getElementById("sceneTag"),
+  text: document.getElementById("sceneText"),
+  feedback: document.getElementById("sceneFeedback"),
+  choices: document.getElementById("choices")
+};
+
+/* 渲染指定节点 */
+function render(key) {
+  const scene = scenes[key];
+  el.feedback.classList.add("hidden");
+
+  if (key === "win") return renderWin();
+
+  el.tag.textContent = scene.tag;
+  el.text.textContent = scene.text;
+  el.choices.innerHTML = "";
+  scene.choices.forEach(c => {
+    const btn = document.createElement("button");
+    btn.className = "choice";
+    btn.textContent = c.text;
+    btn.onclick = () => {
+      score += c.score;
+      currentChoice = c;
+      el.score.textContent = score;
+      if (c.next === "win") return render("win");
+      showFeedback(c.next);
+    };
+    el.choices.appendChild(btn);
+  });
+}
+
+/* 选项后：先展示结果反馈，玩家点"继续"再进入下一节点 */
+function showFeedback(nextKey) {
+  const scene = scenes[nextKey];
+  el.tag.textContent = scene.tag;
+  el.text.textContent = scene.text;
+  el.choices.innerHTML = "";
+
+  const fb = scene.feedback || "剧情继续……";
+  el.feedback.textContent = (c => c.score < 0 ? `得分 ${c.score}。` : c.score > 0 ? `得分 +${c.score}。` : "")(currentChoice) + fb;
+  el.feedback.classList.remove("hidden");
+
+  const btn = document.createElement("button");
+  btn.className = "choice";
+  btn.textContent = "继续 →";
+  btn.onclick = () => render(nextKey);
+  el.choices.appendChild(btn);
+}
+
+/* 记录刚点的选项，用于反馈文案 */
+let currentChoice = null;
+
+/* 胜利结算页：按分数给评价 */
+function renderWin() {
+  el.tag.textContent = "🎉 通关胜利";
+  let rank = "普通中侨人";
+  if (score >= 70) rank = "校园传说 · 学霸";
+  else if (score >= 40) rank = "优秀中侨人";
+  else if (score < 20) rank = "快乐摸鱼人";
+  el.text.textContent =
+    `这一天顺利结束！\n你经历了早八、图书馆和招新夜，\n用一个个选择书写了属于自己的校园故事。\n\n最终评价：【 ${rank} 】`;
+  el.feedback.classList.add("hidden");
+  el.choices.innerHTML = "";
+  const finalScore = document.createElement("div");
+  finalScore.className = "final-score";
+  finalScore.textContent = `最终得分：${score}`;
+  el.choices.appendChild(finalScore);
+
+  const btn = document.createElement("button");
+  btn.className = "choice";
+  btn.textContent = "再玩一次";
+  btn.onclick = restart;
+  el.choices.appendChild(btn);
+}
+
+function restart() {
+  score = 0;
+  el.score.textContent = 0;
+  render("start");
+}
+
+/* 启动游戏 */
+render("start");
+</script>
+</body>
+</html>

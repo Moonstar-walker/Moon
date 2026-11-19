@@ -1,0 +1,1048 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<!-- 【可修改文案】浏览器标签页标题 -->
+<title>校园AI梗王争霸赛</title>
+
+<!--
+  ==========================================================================
+  校园AI梗王争霸赛 · 单文件游戏（HTML + CSS + JS 全部在本文件内）
+  ==========================================================================
+  【快速调整索引】在编辑器里按 Ctrl+F 搜索下面的关键词即可直达：
+
+   ★图片★   → 搜索「图片」：题库 QUESTIONS 的 img / placeholder 字段，
+               填入 AI 梗图路径即可替换占位图；.meme-box img 控制图片显示样式。
+
+   ★文案★   → 搜索「文案」：标题、副标题、按钮、每题提示、反馈语、
+               结束页、弹窗等所有显示文字。主标题注意 data-text 要同步改。
+
+   ★难度★   → 搜索「难度」：QUIZ_COUNT（每局抽题数）、TIME_LIMIT（答题秒数）、
+               连击阈值与加分、切题间隔、题库题量、选项数量、排行榜条数。
+
+   ★排行榜★ → 搜索「排行榜」：存储键名 LB_KEY、保留条数 slice(0,5)。
+
+  说明：本文件不依赖任何外部图片/字体/脚本，双击即可离线运行。
+  ==========================================================================
+-->
+<style>
+  :root {
+    --cyan: #00f0ff;
+    --magenta: #ff00d4;
+    --purple: #9d00ff;
+    --yellow: #f9f002;
+    --green: #39ff14;
+    --red: #ff2a5f;
+    --bg: #05050f;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  html, body {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: var(--bg);
+    font-family: "Segoe UI", "Microsoft YaHei", "PingFang SC", sans-serif;
+    color: #fff;
+  }
+
+  /* ============ 背景层 ============ */
+  .cyber-bg {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    overflow: hidden;
+    background:
+      radial-gradient(ellipse at 50% 120%, rgba(157, 0, 255, 0.35), transparent 60%),
+      radial-gradient(ellipse at 50% -10%, rgba(0, 240, 255, 0.15), transparent 55%),
+      linear-gradient(180deg, #05050f 0%, #0a0518 100%);
+  }
+
+  /* 透视网格 */
+  .grid {
+    position: absolute;
+    left: -50%; right: -50%; bottom: -10%;
+    height: 75%;
+    background-image:
+      linear-gradient(rgba(0, 240, 255, 0.35) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255, 0, 212, 0.25) 1px, transparent 1px);
+    background-size: 60px 60px;
+    transform: perspective(340px) rotateX(62deg);
+    transform-origin: center bottom;
+    animation: gridMove 2.2s linear infinite;
+    mask-image: linear-gradient(to top, #000 30%, transparent 90%);
+    -webkit-mask-image: linear-gradient(to top, #000 30%, transparent 90%);
+  }
+  @keyframes gridMove {
+    from { background-position: 0 0; }
+    to   { background-position: 0 60px; }
+  }
+
+  /* 光晕球 */
+  .orb {
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(80px);
+    opacity: 0.5;
+    animation: float 9s ease-in-out infinite;
+  }
+  .orb-1 { width: 380px; height: 380px; background: var(--magenta); top: -80px; left: -100px; }
+  .orb-2 { width: 420px; height: 420px; background: var(--cyan); bottom: -120px; right: -120px; animation-delay: -3s; }
+  .orb-3 { width: 260px; height: 260px; background: var(--purple); top: 40%; left: 55%; animation-delay: -6s; }
+  @keyframes float {
+    0%, 100% { transform: translate(0, 0) scale(1); }
+    33%      { transform: translate(40px, -30px) scale(1.12); }
+    66%      { transform: translate(-30px, 25px) scale(0.92); }
+  }
+
+  /* 扫描线 */
+  .scanlines {
+    position: absolute; inset: 0; pointer-events: none;
+    background: repeating-linear-gradient(0deg, rgba(0,0,0,0.18) 0px, rgba(0,0,0,0.18) 1px, transparent 1px, transparent 3px);
+    z-index: 3;
+  }
+  .scan-bar {
+    position: absolute; left: 0; right: 0; height: 90px;
+    background: linear-gradient(to bottom, transparent, rgba(0, 240, 255, 0.08), transparent);
+    animation: scan 6s linear infinite;
+    z-index: 4; pointer-events: none;
+  }
+  @keyframes scan {
+    0% { top: -100px; }
+    100% { top: 100%; }
+  }
+
+  /* 漂浮粒子 */
+  .particle-layer { position: absolute; inset: 0; z-index: 2; pointer-events: none; }
+  .particle {
+    position: absolute; width: 3px; height: 3px; border-radius: 50%;
+    background: var(--cyan); box-shadow: 0 0 8px var(--cyan);
+    opacity: 0; animation: floatUp linear infinite;
+  }
+  @keyframes floatUp {
+    0%   { transform: translateY(0) translateX(0); opacity: 0; }
+    10%  { opacity: 0.9; }
+    90%  { opacity: 0.9; }
+    100% { transform: translateY(-160px) translateX(30px); opacity: 0; }
+  }
+
+  /* 边角装饰 */
+  .corner {
+    position: absolute; width: 60px; height: 60px; z-index: 5;
+    border-color: var(--cyan); border-style: solid; opacity: 0.6;
+  }
+  .corner.tl { top: 24px; left: 24px; border-width: 2px 0 0 2px; }
+  .corner.tr { top: 24px; right: 24px; border-width: 2px 2px 0 0; }
+  .corner.bl { bottom: 24px; left: 24px; border-width: 0 0 2px 2px; }
+  .corner.br { bottom: 24px; right: 24px; border-width: 0 2px 2px 0; }
+
+  .side-label {
+    position: absolute; z-index: 5; font-size: 11px; letter-spacing: 4px;
+    color: var(--cyan); opacity: 0.45; writing-mode: vertical-rl;
+  }
+  .side-label.left { left: 26px; top: 50%; transform: translateY(-50%); }
+  .side-label.right { right: 26px; top: 50%; transform: translateY(-50%) rotate(180deg); }
+
+  /* ============ 页面容器 ============ */
+  .screen {
+    position: relative; z-index: 10;
+    width: 100%; height: 100%;
+    display: none; flex-direction: column;
+    align-items: center; justify-content: center;
+    padding: 24px;
+  }
+  .screen.active { display: flex; animation: fadeIn 0.5s ease; }
+  @keyframes fadeIn { from { opacity: 0; transform: scale(0.98); } to { opacity: 1; transform: scale(1); } }
+
+  /* ============ 开始界面 ============ */
+  .badge {
+    font-size: 13px; letter-spacing: 6px; color: var(--magenta);
+    text-transform: uppercase; margin-bottom: 22px;
+    text-shadow: 0 0 12px var(--magenta);
+    animation: blink 2.5s infinite;
+  }
+  @keyframes blink { 0%,100%{opacity:1;} 50%{opacity:0.4;} }
+
+  .title {
+    position: relative;
+    font-size: clamp(2.4rem, 7vw, 5.4rem);
+    font-weight: 900;
+    letter-spacing: 0.08em;
+    text-align: center;
+    line-height: 1.2;
+    color: #fff;
+    text-shadow:
+      0 0 10px var(--cyan),
+      0 0 24px var(--cyan),
+      0 0 48px var(--purple),
+      0 0 80px var(--purple);
+    animation: flicker 5s infinite;
+  }
+  .title::before, .title::after {
+    content: attr(data-text);
+    position: absolute; left: 0; top: 0; width: 100%;
+    background: transparent; overflow: hidden;
+  }
+  .title::before {
+    color: var(--magenta);
+    text-shadow: -2px 0 var(--magenta);
+    animation: glitchTop 3s infinite linear alternate-reverse;
+  }
+  .title::after {
+    color: var(--cyan);
+    text-shadow: 2px 0 var(--cyan);
+    animation: glitchBottom 2.6s infinite linear alternate-reverse;
+  }
+  @keyframes flicker {
+    0%, 19%, 21%, 23%, 25%, 54%, 56%, 100% { opacity: 1; }
+    20%, 24%, 55% { opacity: 0.55; }
+  }
+  @keyframes glitchTop {
+    0%   { clip-path: inset(0 0 100% 0); transform: translate(0); }
+    10%  { clip-path: inset(8% 0 70% 0); transform: translate(-4px, -2px); }
+    20%  { clip-path: inset(35% 0 45% 0); transform: translate(4px, 2px); }
+    30%  { clip-path: inset(60% 0 20% 0); transform: translate(-3px, 1px); }
+    40%  { clip-path: inset(15% 0 75% 0); transform: translate(3px, -1px); }
+    50%,100% { clip-path: inset(0 0 100% 0); transform: translate(0); }
+  }
+  @keyframes glitchBottom {
+    0%   { clip-path: inset(100% 0 0 0); transform: translate(0); }
+    12%  { clip-path: inset(65% 0 15% 0); transform: translate(4px, 2px); }
+    24%  { clip-path: inset(40% 0 40% 0); transform: translate(-4px, -2px); }
+    36%  { clip-path: inset(80% 0 5% 0);  transform: translate(3px, 1px); }
+    48%  { clip-path: inset(25% 0 60% 0); transform: translate(-3px, -1px); }
+    60%,100% { clip-path: inset(100% 0 0 0); transform: translate(0); }
+  }
+
+  .subtitle {
+    margin-top: 26px;
+    font-size: clamp(0.85rem, 1.8vw, 1.1rem);
+    letter-spacing: 4px;
+    color: rgba(255, 255, 255, 0.7);
+    text-align: center;
+  }
+  .subtitle span { color: var(--yellow); text-shadow: 0 0 10px var(--yellow); }
+
+  .start-btn {
+    position: relative;
+    margin-top: 56px;
+    padding: 20px 64px;
+    font-size: 1.5rem;
+    font-weight: 800;
+    letter-spacing: 4px;
+    color: var(--cyan);
+    background: rgba(0, 240, 255, 0.06);
+    border: 2px solid var(--cyan);
+    clip-path: polygon(18px 0, 100% 0, 100% calc(100% - 18px), calc(100% - 18px) 100%, 0 100%, 0 18px);
+    cursor: pointer;
+    overflow: hidden;
+    text-shadow: 0 0 10px var(--cyan);
+    box-shadow: 0 0 20px rgba(0, 240, 255, 0.25), inset 0 0 20px rgba(0, 240, 255, 0.1);
+    transition: all 0.25s ease;
+    animation: btnPulse 2.5s infinite;
+  }
+  @keyframes btnPulse {
+    0%, 100% { box-shadow: 0 0 20px rgba(0,240,255,0.25), inset 0 0 20px rgba(0,240,255,0.1); }
+    50%      { box-shadow: 0 0 40px rgba(0,240,255,0.55), inset 0 0 30px rgba(0,240,255,0.2); }
+  }
+  .start-btn::after {
+    content: ""; position: absolute; top: 0; left: -60%;
+    width: 40%; height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
+    transform: skewX(-25deg);
+    animation: shine 3s infinite;
+  }
+  @keyframes shine { 0%{left:-60%;} 20%,100%{left:140%;} }
+  .start-btn:hover {
+    color: #05050f;
+    background: var(--cyan);
+    transform: scale(1.06);
+    text-shadow: none;
+    box-shadow: 0 0 50px var(--cyan);
+  }
+  .start-btn:active { transform: scale(0.98); }
+
+  .tips {
+    margin-top: 30px; font-size: 0.8rem; letter-spacing: 2px;
+    color: rgba(255, 255, 255, 0.35);
+  }
+
+  /* ============ 关卡界面 ============ */
+  .game-panel {
+    width: min(620px, 100%);
+    background: rgba(8, 8, 26, 0.78);
+    border: 1px solid rgba(0, 240, 255, 0.4);
+    box-shadow: 0 0 40px rgba(0, 240, 255, 0.15), inset 0 0 40px rgba(157, 0, 255, 0.1);
+    padding: 30px 34px 36px;
+    clip-path: polygon(0 0, calc(100% - 24px) 0, 100% 24px, 100% 100%, 24px 100%, 0 calc(100% - 24px));
+    backdrop-filter: blur(6px);
+  }
+  .panel-header {
+    display: flex; align-items: center; justify-content: space-between;
+    border-bottom: 1px solid rgba(0, 240, 255, 0.25);
+    padding-bottom: 16px; margin-bottom: 22px;
+  }
+  .level-badge {
+    font-size: 1.1rem; font-weight: 800; letter-spacing: 3px;
+    color: var(--magenta); text-shadow: 0 0 12px var(--magenta);
+  }
+  .back-btn {
+    background: transparent; border: 1px solid var(--cyan); color: var(--cyan);
+    padding: 6px 14px; font-size: 0.8rem; cursor: pointer; letter-spacing: 1px;
+    transition: all 0.2s;
+  }
+  .back-btn:hover { background: var(--cyan); color: #05050f; }
+
+  .ai-label {
+    text-align: center; font-size: 0.75rem; letter-spacing: 3px;
+    color: var(--yellow); margin-bottom: 12px; text-shadow: 0 0 8px var(--yellow);
+  }
+
+  /* 梗图占位区：后期把内部换成 <img src="你的图片路径" /> 即可 */
+  .meme-box {
+    height: 190px;
+    border: 1px dashed rgba(0, 240, 255, 0.45);
+    background: repeating-linear-gradient(45deg, rgba(0,240,255,0.04) 0, rgba(0,240,255,0.04) 12px, transparent 12px, transparent 24px);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    margin-bottom: 22px; overflow: hidden;
+  }
+  .meme-box img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .placeholder-icon { font-size: 3rem; filter: drop-shadow(0 0 12px var(--cyan)); }
+  .placeholder-text { margin-top: 10px; font-size: 0.8rem; letter-spacing: 2px; color: rgba(0, 240, 255, 0.75); }
+  .placeholder-sub { margin-top: 5px; font-size: 0.68rem; letter-spacing: 1px; color: rgba(255,255,255,0.35); }
+
+  .hint {
+    text-align: center; font-size: 1.05rem; margin-bottom: 18px;
+    color: rgba(255, 255, 255, 0.85); line-height: 1.6;
+  }
+
+  /* 选项按钮 */
+  .options { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .option-btn {
+    position: relative; padding: 15px 16px;
+    font-size: 1rem; font-weight: 700; letter-spacing: 2px;
+    color: var(--cyan);
+    background: rgba(0, 240, 255, 0.05);
+    border: 1px solid rgba(0, 240, 255, 0.5);
+    cursor: pointer;
+    clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
+    transition: all 0.2s ease;
+    text-shadow: 0 0 8px rgba(0, 240, 255, 0.5);
+  }
+  .option-btn:hover:not(:disabled) {
+    background: rgba(0, 240, 255, 0.18);
+    transform: translateY(-2px);
+    box-shadow: 0 0 18px rgba(0, 240, 255, 0.4);
+  }
+  .option-btn .opt-key { margin-right: 10px; opacity: 0.6; font-size: 0.85rem; }
+  .option-btn.correct {
+    background: rgba(57, 255, 20, 0.18); border-color: var(--green);
+    color: var(--green); text-shadow: 0 0 10px var(--green);
+    box-shadow: 0 0 24px rgba(57, 255, 20, 0.5);
+  }
+  .option-btn.wrong {
+    background: rgba(255, 42, 95, 0.18); border-color: var(--red);
+    color: var(--red); text-shadow: 0 0 10px var(--red);
+    box-shadow: 0 0 24px rgba(255, 42, 95, 0.5);
+  }
+  .option-btn.dim { opacity: 0.35; }
+  .option-btn:disabled { cursor: default; }
+
+  .feedback { min-height: 28px; text-align: center; margin-top: 16px; font-size: 1rem; letter-spacing: 1px; }
+  .feedback.correct { color: var(--green); text-shadow: 0 0 10px var(--green); }
+  .feedback.wrong { color: var(--red); text-shadow: 0 0 10px var(--red); }
+  .countdown { color: var(--yellow); font-size: 0.85rem; animation: blink 1s infinite; }
+
+  /* ===== 10 秒倒计时条 ===== */
+  .timer-wrap { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+  .timer-label { font-size: 0.72rem; letter-spacing: 2px; color: var(--cyan); white-space: nowrap; }
+  .timer-track {
+    flex: 1; height: 10px; background: rgba(0,0,0,0.5);
+    border: 1px solid rgba(0,240,255,0.35); overflow: hidden;
+  }
+  .timer-fill {
+    height: 100%; width: 100%;
+    background: linear-gradient(90deg, var(--green), var(--cyan));
+    box-shadow: 0 0 12px var(--cyan);
+    transform-origin: left center;
+  }
+  .timer-fill.danger { background: linear-gradient(90deg, var(--red), var(--yellow)); box-shadow: 0 0 12px var(--red); }
+  .timer-num { font-size: 0.85rem; font-weight: 800; color: var(--yellow); width: 44px; text-align: right; }
+
+  /* ===== 连击特效 ===== */
+  .game-panel.shake { animation: shake 0.5s cubic-bezier(.36,.07,.19,.97); }
+  @keyframes shake {
+    10%, 90% { transform: translateX(-2px) rotate(-0.3deg); }
+    20%, 80% { transform: translateX(4px) rotate(0.3deg); }
+    30%, 50%, 70% { transform: translateX(-8px); }
+    40%, 60% { transform: translateX(8px); }
+  }
+  .combo-banner {
+    position: fixed; top: 30%; left: 50%; z-index: 90;
+    transform: translate(-50%, -50%) scale(0.4);
+    font-size: clamp(1.8rem, 7vw, 3.6rem); font-weight: 900; letter-spacing: 4px;
+    color: var(--yellow); white-space: nowrap; pointer-events: none; opacity: 0;
+    text-shadow: 0 0 20px var(--yellow), 0 0 45px var(--magenta), 3px 3px 0 var(--magenta);
+  }
+  .combo-banner.pop { animation: comboPop 1.1s ease-out forwards; }
+  @keyframes comboPop {
+    0%   { opacity: 0; transform: translate(-50%,-50%) scale(0.3) rotate(-8deg); }
+    25%  { opacity: 1; transform: translate(-50%,-50%) scale(1.15) rotate(3deg); }
+    70%  { opacity: 1; transform: translate(-50%,-50%) scale(1) rotate(0deg); }
+    100% { opacity: 0; transform: translate(-50%,-70%) scale(1.1); }
+  }
+
+  /* ===== 新纪录弹窗 ===== */
+  .modal-mask {
+    position: fixed; inset: 0; z-index: 100; display: none;
+    align-items: center; justify-content: center; padding: 20px;
+    background: rgba(2,2,10,0.82); backdrop-filter: blur(4px);
+  }
+  .modal-mask.show { display: flex; animation: fadeIn 0.3s ease; }
+  .modal-box {
+    width: min(420px, 100%); padding: 32px 28px; text-align: center;
+    background: rgba(8,8,26,0.97); border: 1px solid var(--yellow);
+    box-shadow: 0 0 45px rgba(249,240,2,0.35);
+    clip-path: polygon(0 0, calc(100% - 20px) 0, 100% 20px, 100% 100%, 20px 100%, 0 calc(100% - 20px));
+  }
+  .modal-box h2 { font-size: 1.6rem; color: var(--yellow); text-shadow: 0 0 16px var(--yellow); margin-bottom: 8px; }
+  .modal-box p { font-size: 0.9rem; color: rgba(255,255,255,0.75); margin-bottom: 20px; }
+  .modal-box input {
+    width: 100%; padding: 13px 14px; font-size: 1rem; text-align: center;
+    background: rgba(0,0,0,0.5); border: 1px solid var(--cyan); color: #fff;
+    outline: none; letter-spacing: 2px;
+  }
+  .modal-box input:focus { border-color: var(--magenta); box-shadow: 0 0 14px rgba(255,0,212,0.4); }
+  .modal-actions { display: flex; gap: 12px; margin-top: 20px; }
+  .modal-actions button { flex: 1; padding: 12px 0; font-weight: 700; letter-spacing: 2px; cursor: pointer; border: none; }
+  .modal-save { background: var(--yellow); color: #05050f; box-shadow: 0 0 18px rgba(249,240,2,0.5); }
+  .modal-save:hover { background: var(--cyan); box-shadow: 0 0 22px var(--cyan); }
+  .modal-skip { background: transparent; color: rgba(255,255,255,0.65); border: 1px solid rgba(255,255,255,0.3) !important; }
+  .modal-skip:hover { color: #fff; }
+
+  /* ===== 排行榜 ===== */
+  .leaderboard { margin-top: 24px; text-align: left; }
+  .leaderboard h3 { font-size: 0.85rem; letter-spacing: 4px; color: var(--cyan); text-shadow: 0 0 10px var(--cyan); margin-bottom: 12px; text-align: center; }
+  .rank-list { list-style: none; max-width: 380px; margin: 0 auto; }
+  .rank-list li {
+    display: flex; align-items: center; gap: 12px; padding: 9px 14px; margin-bottom: 6px;
+    background: rgba(0,240,255,0.05); border-left: 2px solid var(--cyan); font-size: 0.92rem;
+  }
+  .rank-list li:first-child { border-left-color: var(--yellow); background: rgba(249,240,2,0.08); }
+  .rank-no { width: 26px; font-weight: 900; color: var(--yellow); }
+  .rank-name { flex: 1; color: #fff; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .rank-score { color: var(--magenta); font-weight: 800; text-shadow: 0 0 8px var(--magenta); }
+  .rank-empty { justify-content: center; color: rgba(255,255,255,0.4); font-size: 0.85rem; border: none !important; background: none !important; }
+
+  .score-bar {
+    display: flex; justify-content: space-between; margin-top: 20px;
+    padding-top: 16px; border-top: 1px solid rgba(0, 240, 255, 0.25);
+    font-size: 0.9rem; letter-spacing: 2px; color: rgba(255,255,255,0.6);
+  }
+  .score-bar b { color: var(--yellow); text-shadow: 0 0 10px var(--yellow); font-size: 1.1rem; }
+
+  .result-panel { text-align: center; }
+  .result-title {
+    font-size: 2.4rem; font-weight: 900; letter-spacing: 3px;
+    color: var(--yellow); text-shadow: 0 0 20px var(--yellow), 0 0 40px var(--magenta);
+    margin-bottom: 20px; animation: flicker 3s infinite;
+  }
+  .result-score { font-size: 1.3rem; color: #fff; margin-bottom: 30px; }
+  .result-score b { color: var(--cyan); font-size: 2rem; text-shadow: 0 0 14px var(--cyan); }
+  .replay-btn {
+    padding: 14px 42px; font-size: 1.1rem; font-weight: 700; letter-spacing: 3px;
+    color: #05050f; background: var(--cyan); border: none; cursor: pointer;
+    box-shadow: 0 0 26px var(--cyan); transition: all 0.2s;
+  }
+  .replay-btn:hover { transform: scale(1.05); background: var(--yellow); box-shadow: 0 0 30px var(--yellow); }
+
+  @media (max-width: 600px) {
+    .start-btn { padding: 16px 40px; font-size: 1.2rem; }
+    .game-panel { padding: 22px 18px 26px; }
+    .options { grid-template-columns: 1fr; }
+    .side-label { display: none; }
+  }
+</style>
+</head>
+<body>
+
+  <!-- 动态背景 -->
+  <div class="cyber-bg">
+    <div class="grid"></div>
+    <div class="orb orb-1"></div>
+    <div class="orb orb-2"></div>
+    <div class="orb orb-3"></div>
+    <div class="particle-layer" id="particles"></div>
+    <div class="scanlines"></div>
+    <div class="scan-bar"></div>
+    <div class="corner tl"></div>
+    <div class="corner tr"></div>
+    <div class="corner bl"></div>
+    <div class="corner br"></div>
+    <div class="side-label left">CAMPUS MEME KING 2026</div>
+    <div class="side-label right">SYSTEM ONLINE // AI READY</div>
+  </div>
+
+  <!-- 开始界面 -->
+  <div id="start-screen" class="screen active">
+    <!-- 【可修改文案】顶部小标语 -->
+    <div class="badge">// AI GENERATED · GUESS THE WORD //</div>
+    <!-- 【可修改文案】主标题：data-text 属性与标签内的文字要改成一样，否则故障动画会显示旧文字 -->
+    <h1 class="title" data-text="校园AI梗王争霸赛">校园AI梗王争霸赛</h1>
+    <!-- 【可修改文案】副标题；<span> 内的字是高亮色 -->
+    <p class="subtitle">看梗图 · 猜校园热词 · <span>谁是真正的梗王？</span></p>
+    <!-- 【可修改文案】开始按钮文字 -->
+    <button class="start-btn" id="start-btn">开始挑战</button>
+    <!-- 【可修改文案】底部玩法提示 -->
+    <p class="tips">100 题题库随机抽 10 题 · 10 秒限时 · 连击翻倍 · 答完点击可立即跳关</p>
+  </div>
+
+  <!-- 关卡界面 -->
+  <div id="game-screen" class="screen">
+    <div class="game-panel">
+      <div class="panel-header">
+        <span class="level-badge" id="level-badge">LEVEL 01</span>
+        <button class="back-btn" id="back-btn">← 返回首页</button>
+      </div>
+
+      <div id="question-area">
+        <!-- 10 秒倒计时条（秒数在 JS 的 TIME_LIMIT 中调整） -->
+        <div class="timer-wrap">
+          <!-- 【可修改文案】倒计时标签 -->
+          <span class="timer-label">⏱ 作答倒计时</span>
+          <div class="timer-track"><div class="timer-fill" id="timer-fill"></div></div>
+          <span class="timer-num" id="timer-num">10s</span>
+        </div>
+        <!-- 【可修改文案】题目区上方小标题 -->
+        <div class="ai-label">✦ AI 生成梗图 · 猜猜对应热词 ✦</div>
+        <!-- 【★图片★】题目图片区：图片本身由下方 JS 题库 QUESTIONS 的 img 字段决定，
+             留空则显示 placeholder 占位表情。想换成真实梗图，去 JS 题库填 img 路径。 -->
+        <div class="meme-box" id="meme-box"></div>
+        <!-- 题目提示语，内容来自 JS 题库每题的 hint 字段 -->
+        <p class="hint" id="hint"></p>
+        <!-- 选项区域：选项文字来自 JS 题库每题的 options 数组 -->
+        <div class="options" id="options"></div>
+        <!-- 答题反馈语（正确/错误/连击提示）在 JS 中生成，搜索「反馈文案」 -->
+        <p class="feedback" id="feedback"></p>
+        <div class="score-bar">
+          <!-- 【可修改文案】计分栏标签；进度总数会由 JS 自动按题库题量改写 -->
+          <span>进度 <b id="progress">1/5</b></span>
+          <span>连击 <b id="streak">0</b></span>
+          <span>得分 <b id="score">0</b></span>
+        </div>
+      </div>
+
+      <!-- 结束页 -->
+      <div id="result-area" style="display:none;" class="result-panel">
+        <!-- 【可修改文案】结束页标题与得分说明 -->
+        <div class="result-title">🏆 梗王诞生 🏆</div>
+        <p class="result-score">你的最终得分：<b id="final-score">0</b> 分</p>
+        <div class="leaderboard">
+          <!-- 【可修改文案】排行榜标题；TOP 5 的 5 由 JS 的 slice(0, 5) 控制，改条数要同步 -->
+          <h3>◇ 本地排行榜 TOP 5 ◇</h3>
+          <ol class="rank-list" id="rank-list"></ol>
+        </div>
+        <!-- 【可修改文案】再战按钮文字 -->
+        <button class="replay-btn" id="replay-btn">再战一局</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 连击横幅：文字内容在 JS 的 triggerCombo() 中生成 -->
+  <div class="combo-banner" id="combo-banner"></div>
+
+  <!-- 新纪录昵称弹窗 -->
+  <div class="modal-mask" id="record-modal">
+    <div class="modal-box">
+      <!-- 【可修改文案】弹窗标题、说明、输入框占位符、两个按钮文字。
+           maxlength="10" 是昵称最大字数，JS 中还有一道 slice(0,10) 限制，改字数要同步两处。 -->
+      <h2>🎉 冲击排行榜！</h2>
+      <p>恭喜以 <b id="record-score" style="color:var(--cyan);font-size:1.3rem;">0</b> 分刷新最高纪录！<br/>留下你的昵称吧</p>
+      <input id="player-name" type="text" maxlength="10" placeholder="输入你的昵称（最多10字）" autocomplete="off" />
+      <div class="modal-actions">
+        <button class="modal-skip" id="modal-skip">跳过</button>
+        <button class="modal-save" id="modal-save">保存成绩</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+  /* ============================================================
+     【★图片★ + 可修改文案 + 可调难度】题库区（100 题，每局随机抽 QUIZ_COUNT 题）
+
+     用下面的 Q() 快速建题，参数依次为：
+       Q("占位表情", "提示语", "选项A|选项B|选项C|选项D", 正确答案下标, "梗图路径")
+
+       · 占位表情 → 【★图片★】没图时显示的表情，可随便换
+       · 提示语   → 可修改文案
+       · 选项     → 用竖线 | 分隔 4 个选项文字
+       · 答案下标 → 0=第1个选项，1=第2个，2=第3个，3=第4个
+       · 梗图路径 → 【★图片★】第 5 个参数，留空就用占位表情；
+                     填 "assets/meme1.png" 或网络图 URL 即可换成 AI 梗图
+
+     【可调难度】每局抽题数在下方 QUIZ_COUNT；选项每次开局会自动打乱，
+                  所以答案位置不用刻意分布，系统已帮你随机化。
+     【改题量】直接增删下面的 Q(...) 行即可。
+     ============================================================ */
+  const Q = (ph, hint, opts, ans, img = "") => ({
+    img: img, placeholder: ph, hint: hint, options: opts.split("|"), answer: ans
+  });
+
+  const QUESTIONS = [
+    Q("😴☀️📚", "每天早上八点，打工人噩梦的开始", "早八|午休|晚自习|体育课", 0),
+    Q("💀⏰📝", "它的全称是 deadline", "DDL|GPA|PPT|CPU", 0),
+    Q("📊😱🎓", "决定你假期心情的数字", "学分|绩点|考勤|排名", 1),
+    Q("🏃💦🥵", "跑完八百一千米之后的你", "体测|早八|网课|开题", 0),
+    Q("🍚🥬🍗", "阿姨手一抖，你的菜就少一半", "快递站|图书馆|食堂|宿舍", 2),
+    Q("🌀📚😤", "形容越努力越累的恶性竞争", "内卷|躺平|摆烂|摸鱼", 0),
+    Q("🛋️😌", "放弃挣扎、佛系面对生活", "躺平|内卷|卷王|冲刺", 0),
+    Q("🏃💨📖", "偷偷不去上课的行为", "翘课|签到|点名|自习", 0),
+    Q("📋👀", "老师上课核对出勤", "点名|翘课|补课|放假", 0),
+    Q("📝😰", "不及格后跟下一届重新上课", "补考|重修|旷考|缓考", 1),
+    Q("💰🎓", "成绩优秀可申请的奖励", "奖学金|助学金|贷款|补贴", 0),
+    Q("💸📄", "家庭经济困难学生申请的资助", "助学金|奖学金|奖金|兼职", 0),
+    Q("🛏️🏠", "大学里几个人共用一间的住所", "宿舍|教室|食堂|图书馆", 0),
+    Q("🛏️🔼🔽", "宿舍里上下两层的床", "上下铺|双人床|高低柜|单人床", 0),
+    Q("📚🤫", "考试月要抢座的地方", "图书馆|食堂|操场|礼堂", 0),
+    Q("🌙📖", "晚上的集体自习时间", "晚自习|早读|午休|课间", 0),
+    Q("🌅📖", "清晨的集体读书时间", "早读|晚自习|午休|自习", 0),
+    Q("🔤456", "大学生英语水平考试", "四六级|考研|雅思|托福", 0),
+    Q("🎓📖", "攻读硕士学位的入学考试", "考研|四六级|高考|公考", 0),
+    Q("✅🎓", "成绩优异免试读研", "保研|考研|留学|转专业", 0),
+    Q("💼🏢", "毕业前到企业实践学习", "实习|上课|春游|社团", 0),
+    Q("🍂💼", "秋季的大型校园招聘", "秋招|春招|实习|校庆", 0),
+    Q("🌸💼", "春季的大型校园招聘", "春招|秋招|实习|毕业", 0),
+    Q("📄👤", "找工作时投的个人履历", "简历|论文|报告|笔记", 0),
+    Q("🤝💬", "求职时的面对面考核", "面试|笔试|实习|答辩", 0),
+    Q("📑🎓", "毕业前必须完成的长篇论文", "毕业论文|开题报告|文献综述|实验报告", 0),
+    Q("🎤📊", "毕业论文的口头陈述考核", "答辩|开题|汇报|试讲", 0),
+    Q("📋🔬", "论文开始前提交的研究计划", "开题报告|毕业论文|答辩|查重", 0),
+    Q("🔍📄", "检查论文重复率", "查重|答辩|开题|排版", 0),
+    Q("📚📝", "对某领域文献的综合评述", "文献综述|毕业论文|实验报告|课程设计", 0),
+    Q("👥📝", "几个人合作完成的大作业", "小组作业|个人作业|期中考试|随堂测验", 0),
+    Q("📊🖥️", "汇报时常用的演示文稿", "PPT|Word|Excel|PDF", 0),
+    Q("📖✅", "可以自己选择修读的课程", "选修课|必修课|体育课|实验课", 0),
+    Q("📖🔒", "必须修读并通过的课程", "必修课|选修课|网课|讲座", 0),
+    Q("⚖️📚", "课程的计算单位，修满才能毕业", "学分|绩点|学时|分数", 0),
+    Q("❌📚", "考试不及格的俗称", "挂科|保研|上岸|补考", 0),
+    Q("🔄📖", "转到另一个专业学习", "转专业|转学|休学|复学", 0),
+    Q("🎓🎓", "同时修读两个学位", "双学位|转专业|辅修|交换", 0),
+    Q("🎪👥", "课外兴趣组织", "社团|班级|学院|学生会", 0),
+    Q("🏛️👔", "学生自治组织", "学生会|社团|班委|团委", 0),
+    Q("🪖☀️", "新生入学前的军事训练", "军训|春游|实习|运动", 0),
+    Q("🎉🎒", "迎接新同学的活动", "迎新|毕业|校庆|运动会", 0),
+    Q("🎓🌸", "即将离开校园的季节", "毕业季|开学季|考试周|复习周", 0),
+    Q("🎂🏫", "学校成立的纪念日", "校庆|校运会|迎新|毕业", 0),
+    Q("🏅🏃", "学校举办的体育盛会", "校运会|校庆|晚会|讲座", 0),
+    Q("👀🧘", "课间放松眼睛的操", "眼保健操|广播体操|课间操|瑜伽", 0),
+    Q("💪📻", "课间跟着广播做的体操", "广播体操|眼保健操|跳绳|跑步", 0),
+    Q("🌙📚", "期末集中复习的一段时间", "复习周|考试周|开学周|军训周", 0),
+    Q("📝😰", "密集考试的一段时间", "考试周|复习周|军训周|实习周", 0),
+    Q("❄️🏖️", "学校放的漫长假期", "寒暑假|周末|调休|课间", 0),
+    Q("🎒📅", "新学期开始", "开学|放假|毕业|休学", 0),
+    Q("📆🔁", "调整休息时间凑出的假期", "调休|放假|请假|旷课", 0),
+    Q("✍️📄", "请同学帮忙签到的行为", "代签|签到|打卡|请假", 0),
+    Q("📍📱", "到指定地点登记出勤", "签到|点名|打卡|请假", 0),
+    Q("📖🤝", "向同学借课堂笔记", "借笔记|抄作业|写作业|做笔记", 0),
+    Q("🧠🏆", "对学习非常好的人的称呼", "学霸|班长|学委|课代表", 0),
+    Q("📉😵", "成绩不太理想的自嘲", "学渣|学委|班长|课代表", 0),
+    Q("🙏🐟", "转发好运图片求好运", "转锦鲤|转发抽奖|点赞|收藏", 0),
+    Q("🧋🥤", "加珍珠的快乐饮品", "奶茶|咖啡|可乐|雪碧", 0),
+    Q("🛵📦", "点餐送到宿舍的用餐方式", "外卖|食堂|自带|泡面", 0),
+    Q("📦🏠", "存放快递的站点", "菜鸟驿站|食堂|图书馆|宿舍", 0),
+    Q("💳🎓", "校园里刷的卡", "校园卡|银行卡|公交卡|会员卡", 0),
+    Q("🚪🔑", "进宿舍楼需要的通行方式", "门禁|门铃|钥匙|锁头", 0),
+    Q("👨‍🏫📋", "负责学生日常管理的老师", "辅导员|导师|校长|任课老师", 0),
+    Q("👨‍🏫🔬", "指导研究生做研究的老师", "导师|辅导员|班主任|校长", 0),
+    Q("🧪🔬", "动手操作的课程", "实验课|体育课|网课|讲座", 0),
+    Q("💻🖥️", "计算机等级考试", "计算机二级|四六级|普通话|考研", 0),
+    Q("🗣️📢", "测试普通话水平的考试", "普通话|四六级|计算机二级|雅思", 0),
+    Q("📜👩‍🏫", "当老师的资格认证", "教师资格证|普通话|四六级|驾照", 0),
+    Q("🏛️📝", "报考公务员的俗称", "公考|考研|四六级|校招", 0),
+    Q("🏛️✅", "考入编制内工作", "上岸|落榜|调剂|二战", 0),
+    Q("🎓⚔️", "考研失败后再次备战", "二战|上岸|调剂|复试", 0),
+    Q("🔄📮", "分数不够时申请其他学校", "调剂|复试|录取|推免", 0),
+    Q("✅📨", "研究生拟录取通知", "拟录取|复试|调剂|报名", 0),
+    Q("🩹🧑‍🎓", "形容身体小毛病不断的大学生", "脆皮大学生|特种兵大学生|显眼包|社恐", 0),
+    Q("🎒🚶", "高强度打卡多个景点的大学生旅行", "特种兵旅游|休闲游|跟团游|自驾游", 0),
+    Q("🤡✨", "形容在人群中格外显眼的人", "显眼包|社恐|透明人|路人甲", 0),
+    Q("🙈👥", "形容内向爱独处的人（网络用语）", "i人|e人|社牛|显眼包", 0),
+    Q("🗣️🎉", "形容外向爱社交的人（网络用语）", "e人|i人|社恐|宅男", 0),
+    Q("👯📌", "一起吃饭上课的临时伙伴", "搭子|室友|同学|同事", 0),
+    Q("😩💔", "形容情绪低落郁闷的网络用语", "emo|开心|兴奋|淡定", 0),
+    Q("💥😤", "形容心理防线被击溃", "破防|淡定|开心|平静", 0),
+    Q("🛋️😑", "放弃努力、随遇而安", "摆烂|内卷|冲刺|奋斗", 0),
+    Q("🏆📚", "在学习竞争中特别拼的人", "卷王|学渣|躺平|佛系", 0),
+    Q("🤪📝", "夸张的情绪表达文案", "发疯文学|文言文|说明文|议论文", 0),
+    Q("🙃✍️", "敷衍了事的学习方法", "糊弄学|法学|文学|哲学", 0),
+    Q("😳🙊", "在公共场合极度尴尬", "社死|社牛|社交|社恐", 0),
+    Q("🔥📈", "形容非常厉害、处于巅峰", "天花板|地板|门槛|底线", 0),
+    Q("👍👍", "永远的神，表示极度赞美", "yyds|ddl|gpa|ppt", 0),
+    Q("✨😍", "表示非常好看、极致赞美", "绝绝子|一般般|还可以|凑合", 0),
+    Q("🙏💦", "感谢的谐音梗网络用语", "栓Q|谢谢|抱歉|再见", 0),
+    Q("👋👋", "驱赶坏运气的网络流行语", "退退退|冲冲冲|走走走|看看看", 0),
+    Q("🦆🤭", "可爱语气词，意为真的假的", "尊嘟假嘟|真的假的|是吗|对吧", 0),
+    Q("💃🎵", "曾风靡校园的魔性舞蹈", "科目三|广播体操|兔子舞|广场舞", 0),
+    Q("🍿📺", "吃饭时配的视频内容", "电子榨菜|电子宠物|电子书本|电子笔记", 0),
+    Q("😮‍💨💼", "打工人身上疲惫的气息", "班味|书卷味|汗味|香水味", 0),
+    Q("🐒😩", "自称打工人社畜的萌系形象", "吗喽|考拉|熊猫|兔子", 0),
+    Q("🌈👗", "鲜艳配色的穿搭风格", "多巴胺穿搭|黑白穿搭|极简穿搭|通勤穿搭", 0),
+    Q("🎤🎭", "校园里举办的文艺演出", "晚会|讲座|运动会|考试", 0),
+    Q("📖✍️", "每学期中途进行的小考", "期中|期末|月考|周测", 0)
+  ];
+
+  /* ---------- 状态 ---------- */
+  /* 【可调难度】每局从 100 题里随机抽几道：改 10 就是抽 10 题。
+     抽到几题，进度条就会显示 1/N；结束后按抽到的题数计分。 */
+  const QUIZ_COUNT = 10;
+
+  let currentIndex = 0;
+  let score = 0;
+  let streak = 0;
+  let roundQuestions = [];   // 本局抽取的题目列表
+
+  /* ---------- DOM ---------- */
+  const $ = (id) => document.getElementById(id);
+  const screens = document.querySelectorAll(".screen");
+
+  function showScreen(id) {
+    screens.forEach((s) => s.classList.remove("active"));
+    $(id).classList.add("active");
+  }
+
+  /* ---------- 背景粒子 ---------- */
+  const particleLayer = $("particles");
+  for (let i = 0; i < 45; i++) {
+    const p = document.createElement("div");
+    p.className = "particle";
+    p.style.left = Math.random() * 100 + "%";
+    p.style.top = Math.random() * 100 + "%";
+    p.style.animationDelay = (Math.random() * 5) + "s";
+    p.style.animationDuration = (3 + Math.random() * 4) + "s";
+    if (i % 3 === 0) {
+      p.style.background = "var(--magenta)";
+      p.style.boxShadow = "0 0 8px var(--magenta)";
+    }
+    particleLayer.appendChild(p);
+  }
+
+  /* ---------- 本地排行榜 ---------- */
+  /* 【★排行榜★】localStorage 存储键名。
+     改这个名字 = 换一份全新榜单（旧数据不会显示，但也仍在浏览器里）。
+      score 按分数从高到低排序，只保留前 5 条（见下方 saveScore 的 slice(0, 5)）。 */
+  const LB_KEY = "campusMemeKingRanking";
+
+  function getRanking() {
+    try {
+      const raw = localStorage.getItem(LB_KEY);
+      const arr = raw ? JSON.parse(raw) : [];
+      return Array.isArray(arr) ? arr : [];
+    } catch (e) { return []; }
+  }
+
+  function getHighScore() {
+    const arr = getRanking();
+    return arr.length ? Math.max.apply(null, arr.map((x) => x.score)) : 0;
+  }
+
+  function escapeHtml(str) {
+    return String(str).replace(/[&<>"']/g, (c) => ({
+      "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+    })[c]);
+  }
+
+  function saveScore(name, score) {
+    const arr = getRanking();
+    arr.push({ name: name, score: score, date: new Date().toLocaleDateString() });
+    arr.sort((a, b) => b.score - a.score);
+    /* 【★排行榜★】slice(0, 5) = 只保留前 5 名。改成 10 就是 Top 10，
+       改这里时要同步修改 HTML 结束页的「TOP 5」标题文字。 */
+    try { localStorage.setItem(LB_KEY, JSON.stringify(arr.slice(0, 5))); } catch (e) {}
+    renderRanking();
+  }
+
+  function renderRanking() {
+    const arr = getRanking();
+    const list = $("rank-list");
+    if (!arr.length) {
+      /* 【可修改文案】排行榜为空时显示的提示 */
+      list.innerHTML = '<li class="rank-empty">暂无记录，成为第一位梗王吧！</li>';
+      return;
+    }
+    list.innerHTML = arr.map((item, i) =>
+      '<li><span class="rank-no">' + (i + 1) + '</span>' +
+      '<span class="rank-name">' + escapeHtml(item.name) + '</span>' +
+      '<span class="rank-score">' + item.score + ' 分</span></li>'
+    ).join("");
+  }
+
+  /* ---------- 游戏流程 ---------- */
+  /* 【可调难度】每题作答时限（秒）：改 10 → 15 更宽松，改 5 更紧张。
+     注意：下方 startTimer() 里的 danger 阈值「timeLeft <= 3」表示最后 3 秒变红，
+     如果时限改小，可把 3 也相应调小。 */
+  const TIME_LIMIT = 10;
+  let isLocked = false;               // 当前题是否已作答
+  let questionActive = false;         // 本题计时是否进行中
+  let timeLeft = TIME_LIMIT;
+  let tickTimer = null;               // 10 秒倒计时定时器
+  let nextTimer = null;               // 进入下一关定时器
+  let countdownTimer = null;          // 下一关提示定时器
+  const panel = document.querySelector(".game-panel");
+
+  function stopTimer() {
+    if (tickTimer) { clearInterval(tickTimer); tickTimer = null; }
+    questionActive = false;
+  }
+
+  function startTimer() {
+    stopTimer();
+    timeLeft = TIME_LIMIT;
+    questionActive = true;
+    const fill = $("timer-fill");
+    const num = $("timer-num");
+    fill.style.width = "100%";
+    fill.classList.remove("danger");
+    num.textContent = TIME_LIMIT + "s";
+    tickTimer = setInterval(() => {
+      timeLeft = Math.max(0, timeLeft - 0.1);
+      fill.style.width = (timeLeft / TIME_LIMIT * 100) + "%";
+      num.textContent = Math.ceil(timeLeft) + "s";
+      if (timeLeft <= 3) fill.classList.add("danger");  // 【可调难度】剩余 3 秒时进度条变红警示
+      if (timeLeft <= 0) handleTimeout();
+    }, 100);
+  }
+
+  function clearTimers() {
+    stopTimer();
+    clearTimeout(nextTimer);
+    clearInterval(countdownTimer);
+    nextTimer = null;
+    countdownTimer = null;
+  }
+
+  /* 进入下一题（自动跳或手动点击共用）；用 nextDone 防止重复触发 */
+  let nextDone = false;
+  function goNext() {
+    if (nextDone) return;
+    nextDone = true;
+    clearTimers();
+    currentIndex++;
+    loadQuestion();
+  }
+
+  function scheduleNext(ms) {
+    clearTimeout(nextTimer);
+    clearInterval(countdownTimer);
+    nextDone = false;
+    let remain = Math.ceil(ms / 1000);
+    const countdown = document.createElement("span");
+    countdown.className = "countdown";
+    countdown.id = "auto-next-hint";
+    $("feedback").appendChild(countdown);
+    const write = () => { countdown.textContent = " " + remain + " 秒后自动进入下一关（点击此处可立即继续）"; };
+    write();
+    /* 点击倒计时提示文字 = 立即进入下一题，不用等倒计时结束 */
+    countdown.style.cursor = "pointer";
+    countdown.addEventListener("click", goNext);
+    countdownTimer = setInterval(() => {
+      remain--;
+      if (remain > 0) write();
+      else clearInterval(countdownTimer);
+    }, 1000);
+    nextTimer = setTimeout(goNext, ms);
+  }
+
+  function triggerCombo() {
+    const banner = $("combo-banner");
+    /* 【可修改文案】连击横幅文字，streak 会自动填入当前连击数 */
+    banner.textContent = "🔥 COMBO ×" + streak + " 得分翻倍！";
+    banner.classList.remove("pop");
+    void banner.offsetWidth;
+    banner.classList.add("pop");
+    panel.classList.remove("shake");
+    void panel.offsetWidth;
+    panel.classList.add("shake");
+    setTimeout(() => panel.classList.remove("shake"), 550);
+  }
+
+  /* 洗牌工具：把数组顺序随机打乱（Fisher-Yates 算法） */
+  function shuffle(arr) {
+    const a = arr.slice();
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      const t = a[i]; a[i] = a[j]; a[j] = t;
+    }
+    return a;
+  }
+
+  function startGame() {
+    clearTimers();
+    currentIndex = 0; score = 0; streak = 0;
+    /* 从题库随机抽 QUIZ_COUNT 题；每题的 4 个选项也随机打乱，
+       并重新计算正确答案下标，避免答案总在同一个位置。 */
+    roundQuestions = shuffle(QUESTIONS).slice(0, QUIZ_COUNT).map((q) => {
+      const order = shuffle(q.options.map((_, i) => i));
+      const opts = order.map((i) => q.options[i]);
+      return {
+        img: q.img, placeholder: q.placeholder, hint: q.hint,
+        options: opts,
+        answer: order.indexOf(q.answer)
+      };
+    });
+    $("combo-banner").classList.remove("pop");
+    $("score").textContent = "0";
+    $("streak").textContent = "0";
+    $("question-area").style.display = "block";
+    $("result-area").style.display = "none";
+    $("record-modal").classList.remove("show");
+    showScreen("game-screen");
+    loadQuestion();
+  }
+
+  function loadQuestion() {
+    if (currentIndex >= roundQuestions.length) { showResult(); return; }
+    const q = roundQuestions[currentIndex];
+    isLocked = false;
+
+    $("level-badge").textContent = "LEVEL " + String(currentIndex + 1).padStart(2, "0");
+    $("hint").textContent = q.hint;
+    $("feedback").textContent = "";
+    $("feedback").className = "feedback";
+    $("progress").textContent = (currentIndex + 1) + "/" + roundQuestions.length;
+    $("streak").textContent = streak;
+
+    /* 题目区域：题库里 img 有路径就显示图片，否则显示占位图 */
+    const box = $("meme-box");
+    box.innerHTML = q.img
+      ? '<img src="' + q.img + '" alt="AI 生成的梗图" />'
+      : '<div class="placeholder-icon">' + q.placeholder + '</div>' +
+        '<div class="placeholder-text">AI 梗图占位区</div>' +
+        '<div class="placeholder-sub">在题库 img 字段填入图片路径即可替换</div>';
+
+    /* 选项区域：动态生成 A/B/C/D 四个按钮 */
+    const keys = ["A", "B", "C", "D"];
+    $("options").innerHTML = q.options.map((opt, i) =>
+      '<button class="option-btn" data-index="' + i + '">' +
+      '<span class="opt-key">' + keys[i] + '</span>' + opt + '</button>'
+    ).join("");
+
+    startTimer();
+  }
+
+  function handleTimeout() {
+    if (!questionActive || isLocked) return;
+    stopTimer();
+    isLocked = true;
+    const q = roundQuestions[currentIndex];
+    const buttons = $("options").querySelectorAll(".option-btn");
+    buttons.forEach((b) => { b.disabled = true; });
+    buttons[q.answer].classList.add("correct");
+    buttons[q.answer].innerHTML = '<span class="opt-key">✓</span>正确答案：' + q.options[q.answer];
+    streak = 0;
+    $("streak").textContent = streak;
+    /* 【可修改文案】超时提示语 */
+    $("feedback").textContent = "⏰ 时间到！正确答案是「" + q.options[q.answer] + "」";
+    $("feedback").className = "feedback wrong";
+    scheduleNext(2500);  // 【可调难度】超时后 2.5 秒自动进下一题（毫秒），可加大留给看答案的时间
+  }
+
+  function selectOption(index) {
+    if (isLocked || !questionActive) return;
+    isLocked = true;
+    stopTimer();
+
+    const q = roundQuestions[currentIndex];
+    const buttons = $("options").querySelectorAll(".option-btn");
+    const feedback = $("feedback");
+    const correctBtn = buttons[q.answer];
+    const chosenBtn = buttons[index];
+
+    buttons.forEach((b) => { b.disabled = true; });
+
+    if (index === q.answer) {
+      /* 【可调难度】计分规则：连击达到 doubledAt 次起，每题得分翻倍。
+         doubledAt=2 表示第 2 题连对开始 +200；baseGain / comboGain 分别是基础分与翻倍分。 */
+      const doubledAt = 2;
+      const baseGain = 100;
+      const comboGain = 200;
+      streak++;
+      const doubled = streak >= doubledAt;
+      const gain = doubled ? comboGain : baseGain;
+      /* 【可修改文案】答对时按钮上显示的文字 */
+      chosenBtn.classList.add("correct");
+      chosenBtn.innerHTML = '<span class="opt-key">✓</span>正确！+' + gain + '分';
+      score += gain;
+      $("score").textContent = score;
+      $("streak").textContent = streak;
+      /* 【可修改文案】答对时的反馈语 */
+      feedback.textContent = doubled
+        ? "🔥 连击 x" + streak + "！得分翻倍 +" + comboGain + "　"
+        : "🎉 答对啦！+" + baseGain + " 分　";
+      feedback.className = "feedback correct";
+      if (doubled) triggerCombo();
+    } else {
+      /* 答错：所点选项变红显示“错啦”，同时标出正确答案 */
+      chosenBtn.classList.add("wrong");
+      chosenBtn.innerHTML = '<span class="opt-key">✗</span>错啦';          // 【可修改文案】错误按钮文字
+      correctBtn.classList.add("correct");
+      correctBtn.innerHTML = '<span class="opt-key">✓</span>正确答案：' + q.options[q.answer]; // 【可修改文案】正确按钮文字
+      buttons.forEach((b) => {
+        if (b !== chosenBtn && b !== correctBtn) b.classList.add("dim");
+      });
+      streak = 0;  // 【可调难度】答错是否清零连击：想保留连击可把这行注释掉
+      $("streak").textContent = streak;
+      /* 【可修改文案】答错时的反馈语 */
+      feedback.textContent = "💥 错啦，正确答案是「" + q.options[q.answer] + "」　";
+      feedback.className = "feedback wrong";
+    }
+
+    scheduleNext(5000);  // 【可调难度】答完一题后 5 秒自动进下一题（毫秒）
+  }
+
+  function showResult() {
+    clearTimers();
+    $("question-area").style.display = "none";
+    $("result-area").style.display = "block";
+    $("final-score").textContent = score;
+    renderRanking();
+    if (score > 0 && score > getHighScore()) {
+      $("record-score").textContent = score;
+      $("player-name").value = "";
+      $("record-modal").classList.add("show");
+      setTimeout(() => $("player-name").focus(), 100);
+    } else {
+      $("record-modal").classList.remove("show");
+    }
+  }
+
+  function submitRecord() {
+    /* 【可修改文案】"匿名梗王" 是昵称留空时的默认名；slice(0,10) 是字数上限，
+       要和 HTML 输入框的 maxlength="10" 保持一致 */
+    const name = $("player-name").value.trim().slice(0, 10) || "匿名梗王";
+    saveScore(name, score);
+    $("record-modal").classList.remove("show");
+  }
+
+  /* ---------- 事件绑定 ---------- */
+  $("start-btn").addEventListener("click", startGame);
+  $("replay-btn").addEventListener("click", startGame);
+  $("back-btn").addEventListener("click", () => {
+    clearTimers();
+    $("record-modal").classList.remove("show");
+    showScreen("start-screen");
+  });
+  $("options").addEventListener("click", (e) => {
+    const btn = e.target.closest(".option-btn");
+    if (btn) selectOption(Number(btn.dataset.index));
+  });
+  /* 【可修改交互】作答后（isLocked=true）点击梗图区或提示语，也能立即进入下一题 */
+  $("meme-box").addEventListener("click", () => { if (isLocked) goNext(); });
+  $("hint").addEventListener("click", () => { if (isLocked) goNext(); });
+  $("modal-save").addEventListener("click", submitRecord);
+  $("modal-skip").addEventListener("click", () => $("record-modal").classList.remove("show"));
+  $("player-name").addEventListener("keydown", (e) => { if (e.key === "Enter") submitRecord(); });
+</script>
+</body>
+</html>

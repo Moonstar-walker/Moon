@@ -1,0 +1,921 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>校园一日闯关 · 星轨代码</title>
+<style>
+  /* ===== 全局：深绿 + 紫色赛博校园 ===== */
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
+    background: #060f0c;
+    color: #e8f0ea;
+    overflow: hidden;
+    user-select: none;
+  }
+
+  /* ===== 舞台（背景场景层） ===== */
+  #stage { position: fixed; inset: 0; }
+  #bg {
+    position: absolute; inset: 0;
+    transition: opacity 0.45s ease;
+  }
+  #bg.fading { opacity: 0; }
+  /* --- 教室 --- */
+  .bg-classroom { background: linear-gradient(180deg, #0e3a2c 0%, #14523f 60%, #1a2b4a 100%); }
+  .bg-classroom::before { /* 窗户 */
+    content: ""; position: absolute; top: 12%; left: 8%;
+    width: 30%; height: 42%;
+    background: linear-gradient(160deg, rgba(196,181,253,0.20), rgba(52,211,153,0.12));
+    border: 2px solid rgba(167,139,250,0.35);
+    box-shadow: 0 0 30px rgba(167,139,250,0.15);
+  }
+  .bg-classroom::after { /* 课桌轮廓 */
+    content: ""; position: absolute; bottom: 0; left: 0; right: 0; height: 18%;
+    background: repeating-linear-gradient(90deg, rgba(10,43,33,0.9) 0 90px, rgba(124,58,237,0.12) 90px 100px);
+    border-top: 2px solid rgba(52,211,153,0.3);
+  }
+  /* --- 走廊 --- */
+  .bg-corridor { background: linear-gradient(90deg, #0a2b21 0%, #14523f 50%, #241543 100%); }
+  .bg-corridor::before { /* 门框透视 */
+    content: ""; position: absolute; inset: 0;
+    background:
+      repeating-linear-gradient(90deg, transparent 0 120px, rgba(167,139,250,0.10) 120px 140px);
+  }
+  .bg-corridor::after { /* 地面反光带 */
+    content: ""; position: absolute; bottom: 0; left: 0; right: 0; height: 22%;
+    background: linear-gradient(180deg, rgba(52,211,153,0.10), transparent);
+    border-top: 1px solid rgba(52,211,153,0.3);
+  }
+  /* --- 图书馆 --- */
+  .bg-library { background: linear-gradient(180deg, #123227 0%, #0a2b21 100%); }
+  .bg-library::before { /* 书架 */
+    content: ""; position: absolute; top: 0; left: 0; right: 0; height: 55%;
+    background:
+      repeating-linear-gradient(90deg,
+        rgba(124,58,237,0.14) 0 26px,
+        rgba(52,211,153,0.10) 26px 40px,
+        rgba(20,82,63,0.6) 40px 56px);
+    border-bottom: 3px solid rgba(167,139,250,0.4);
+  }
+  .bg-library::after { /* 台灯光晕 */
+    content: ""; position: absolute; bottom: 10%; right: 14%;
+    width: 120px; height: 120px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(255,217,125,0.22), transparent 70%);
+  }
+  /* --- 食堂 --- */
+  .bg-canteen { background: linear-gradient(180deg, #173f2f 0%, #14523f 55%, #2a1a4a 100%); }
+  .bg-canteen::before { /* 打饭窗口 */
+    content: ""; position: absolute; top: 14%; left: 6%; right: 6%; height: 34%;
+    background: repeating-linear-gradient(90deg, rgba(255,217,125,0.10) 0 150px, rgba(10,43,33,0.85) 150px 170px);
+    border-top: 2px solid rgba(255,217,125,0.35);
+    border-bottom: 2px solid rgba(255,217,125,0.35);
+  }
+  .bg-canteen::after {
+    content: ""; position: absolute; bottom: 0; left: 0; right: 0; height: 20%;
+    background: repeating-linear-gradient(90deg, rgba(10,43,33,0.9) 0 80px, rgba(52,211,153,0.12) 80px 90px);
+  }
+  /* --- 黄昏操场 --- */
+  .bg-playground { background: linear-gradient(180deg, #2a1a4a 0%, #4a2a5e 35%, #14523f 100%); }
+  .bg-playground::before { /* 落日 */
+    content: ""; position: absolute; top: 8%; right: 18%;
+    width: 110px; height: 110px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(255,180,120,0.85), rgba(255,120,120,0.25) 60%, transparent 75%);
+    box-shadow: 0 0 60px rgba(255,150,100,0.4);
+  }
+  .bg-playground::after { /* 跑道 */
+    content: ""; position: absolute; bottom: -40px; left: -60px; right: -60px; height: 30%;
+    border-radius: 50% 50% 0 0 / 100% 100% 0 0;
+    background: repeating-linear-gradient(90deg, rgba(52,211,153,0.10) 0 60px, rgba(10,43,33,0.8) 60px 72px);
+    border-top: 2px solid rgba(167,139,250,0.4);
+  }
+
+  /* ===== 时间标签 ===== */
+  #timeTag {
+    position: absolute; top: 18px; left: 20px;
+    background: rgba(10,43,33,0.8);
+    border: 1px solid rgba(167,139,250,0.5);
+    color: #c4b5fd;
+    font-size: 14px; letter-spacing: 2px;
+    padding: 6px 16px; border-radius: 999px;
+    z-index: 5;
+  }
+
+  /* ===== 数据面板 ===== */
+  #stats {
+    position: absolute; top: 18px; right: 20px;
+    display: flex; gap: 12px; z-index: 5;
+    font-size: 14px;
+  }
+  .stat-chip {
+    background: rgba(10,43,33,0.8);
+    border: 1px solid rgba(52,211,153,0.4);
+    padding: 6px 14px; border-radius: 999px;
+    color: #ffd97d; font-weight: bold;
+    transition: transform 0.2s;
+  }
+  .stat-chip.bump { transform: scale(1.25); }
+  .stat-chip .ico { color: #f472b6; }
+
+  /* ===== 虚拟人物立绘（纯 CSS） ===== */
+  .sprite {
+    position: absolute;
+    bottom: 190px;
+    left: 12%;
+    width: 230px; height: 320px;
+    z-index: 4;
+    transition: opacity 0.45s ease, filter 0.45s ease;
+    animation: bob 3.2s ease-in-out infinite;
+  }
+  @keyframes bob { 50% { transform: translateY(-7px); } }
+  .sprite.hidden { opacity: 0; filter: blur(4px); pointer-events: none; }
+  .sprite .head {
+    position: absolute; top: 12px; left: 50%; transform: translateX(-50%);
+    width: 96px; height: 104px; border-radius: 46% 46% 52% 52%;
+    background: linear-gradient(180deg, #ffe8d6, #ffd9bd);
+    z-index: 2;
+  }
+  .sprite .hair-front {
+    position: absolute; top: 0; left: 50%; transform: translateX(-50%);
+    width: 108px; height: 62px;
+    border-radius: 56px 56px 26px 26px;
+    z-index: 3;
+  }
+  .sprite .hair-side {
+    position: absolute; top: 30px; width: 26px; height: 110px;
+    border-radius: 14px;
+    z-index: 1;
+  }
+  .sprite .hair-side.l { left: 8px; transform: rotate(8deg); }
+  .sprite .hair-side.r { right: 8px; transform: rotate(-8deg); }
+  .sprite .eyes {
+    position: absolute; top: 58px; left: 50%; transform: translateX(-50%);
+    display: flex; gap: 20px; z-index: 4;
+  }
+  .sprite .eye {
+    width: 12px; height: 16px; border-radius: 50%;
+    background: #1a1033;
+    box-shadow: inset 0 -3px 0 rgba(255,255,255,0.4), 0 0 8px rgba(167,139,250,0.8);
+  }
+  .sprite .mouth {
+    position: absolute; top: 84px; left: 50%; transform: translateX(-50%);
+    width: 16px; height: 7px;
+    border-radius: 0 0 12px 12px;
+    background: #e08a8a; z-index: 4;
+  }
+  .sprite .body {
+    position: absolute; top: 108px; left: 50%; transform: translateX(-50%);
+    width: 170px; height: 200px;
+    border-radius: 60px 60px 26px 26px;
+    z-index: 1;
+  }
+  .sprite .collar {
+    position: absolute; top: 106px; left: 50%; transform: translateX(-50%);
+    width: 52px; height: 26px;
+    background: #f5f5f5;
+    clip-path: polygon(0 0, 100% 0, 50% 100%);
+    z-index: 3;
+  }
+  .sprite .tie {
+    position: absolute; top: 118px; left: 50%; transform: translateX(-50%);
+    width: 12px; height: 42px;
+    background: var(--tie, #7c3aed);
+    clip-path: polygon(0 12%, 100% 12%, 80% 100%, 50% 88%, 20% 100%);
+    z-index: 4;
+  }
+  .sprite .blush {
+    position: absolute; top: 74px; width: 16px; height: 7px; border-radius: 50%;
+    background: rgba(255,130,130,0.45); z-index: 4;
+  }
+  .sprite .blush.l { left: 76px; }
+  .sprite .blush.r { right: 76px; }
+  /* 角色配色 */
+  .sp-xia .hair-front, .sp-xia .hair-side { background: linear-gradient(180deg, #a78bfa, #7c3aed); }
+  .sp-xia .body { background: linear-gradient(180deg, #5b21b6, #3b0f86); }
+  .sp-xia .tie { --tie: #34d399; }
+  .sp-senpai .hair-front, .sp-senpai .hair-side { background: linear-gradient(180deg, #6ee7b7, #10b981); }
+  .sp-senpai .body { background: linear-gradient(180deg, #1f2937, #111827); }
+  .sp-senpai .tie { --tie: #a78bfa; }
+  .sp-teacher .hair-front, .sp-teacher .hair-side { background: linear-gradient(180deg, #6b7280, #374151); }
+  .sp-teacher .body { background: linear-gradient(180deg, #14523f, #0a2b21); }
+  .sp-teacher .tie { --tie: #fbbf24; }
+  .sp-teacher .glasses {
+    position: absolute; top: 56px; left: 50%; transform: translateX(-50%);
+    display: flex; gap: 10px; z-index: 5;
+  }
+  .sp-teacher .glasses i {
+    width: 22px; height: 20px;
+    border: 2px solid #ffd97d; border-radius: 6px;
+    display: block; background: rgba(255,217,125,0.08);
+  }
+
+  /* ===== 对话框 ===== */
+  #dlg {
+    position: absolute; left: 50%; bottom: 22px;
+    transform: translateX(-50%);
+    width: min(92%, 820px);
+    min-height: 150px;
+    background: rgba(8, 26, 20, 0.92);
+    border: 1px solid rgba(167,139,250,0.45);
+    border-radius: 16px;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.6), 0 0 24px rgba(124,58,237,0.15) inset;
+    padding: 20px 26px 46px;
+    cursor: pointer;
+    z-index: 6;
+    animation: rise 0.4s ease;
+    backdrop-filter: blur(4px);
+  }
+  @keyframes rise { from { opacity: 0; transform: translateX(-50%) translateY(24px); } to { opacity: 1; transform: translateX(-50%) translateY(0); } }
+  #nameTag {
+    position: absolute; top: -18px; left: 24px;
+    background: linear-gradient(90deg, #7c3aed, #a78bfa);
+    color: #fff;
+    font-weight: bold; font-size: 15px; letter-spacing: 2px;
+    padding: 5px 20px; border-radius: 999px;
+    box-shadow: 0 4px 14px rgba(124,58,237,0.5);
+  }
+  #dlgText {
+    font-size: 17px; line-height: 2; min-height: 66px;
+    white-space: pre-line; color: #eef5f0;
+  }
+  #dlgHint {
+    position: absolute; right: 20px; bottom: 12px;
+    font-size: 12px; color: rgba(232,240,234,0.4);
+  }
+  #caret {
+    display: inline-block; width: 9px; height: 18px;
+    background: #a78bfa; margin-left: 4px;
+    animation: blink 0.8s steps(1) infinite; vertical-align: -3px;
+  }
+  @keyframes blink { 50% { opacity: 0; } }
+
+  /* ===== 选项按钮 ===== */
+  #choices {
+    position: absolute; left: 50%; bottom: 190px;
+    transform: translateX(-50%);
+    width: min(88%, 560px);
+    display: flex; flex-direction: column; gap: 12px;
+    z-index: 7;
+  }
+  .choice {
+    text-align: left;
+    background: rgba(14, 53, 40, 0.92);
+    border: 1px solid #34d39988;
+    color: #e8f0ea;
+    font-size: 15.5px;
+    padding: 14px 20px;
+    border-radius: 14px;
+    cursor: pointer;
+    transition: 0.18s;
+    opacity: 0; transform: translateY(14px);
+    animation: choiceIn 0.35s ease forwards;
+  }
+  @keyframes choiceIn { to { opacity: 1; transform: translateY(0); } }
+  .choice:hover {
+    background: #a78bfa; border-color: #a78bfa; color: #0e3528;
+    transform: translateX(6px);
+  }
+  .choice .fx { float: right; font-size: 13px; opacity: 0.85; }
+  .fx.good { color: #34d399; }
+  .fx.bad { color: #f87171; }
+
+  /* ===== 开场界面 ===== */
+  #title {
+    position: fixed; inset: 0; z-index: 20;
+    background: radial-gradient(circle at 30% 20%, #14523f 0%, #0a2b21 45%, #1a1033 100%);
+    display: flex; flex-direction: column;
+    justify-content: center; align-items: center;
+    text-align: center; gap: 14px;
+    animation: fadeInT 0.8s ease;
+  }
+  @keyframes fadeInT { from { opacity: 0; } to { opacity: 1; } }
+  #title .stars { position: absolute; inset: 0; overflow: hidden; }
+  #title .stars i {
+    position: absolute; width: 3px; height: 3px; border-radius: 50%;
+    background: #c4b5fd; opacity: 0.6;
+    animation: twinkle 2.4s ease-in-out infinite;
+  }
+  @keyframes twinkle { 50% { opacity: 0.15; transform: scale(0.6); } }
+  #title h1 {
+    font-size: clamp(34px, 7vw, 56px);
+    letter-spacing: 12px;
+    color: #c4b5fd;
+    text-shadow: 0 0 30px rgba(124,58,237,0.7), 0 0 8px rgba(52,211,153,0.5);
+    z-index: 1;
+  }
+  #title .team {
+    font-size: 17px; color: #ffd97d; letter-spacing: 4px; z-index: 1;
+    border: 1px solid rgba(255,217,125,0.4);
+    padding: 6px 22px; border-radius: 999px;
+  }
+  #title .intro { font-size: 14.5px; color: #9fb8ac; line-height: 2.1; z-index: 1; }
+  #btnStart {
+    z-index: 1;
+    background: linear-gradient(90deg, #7c3aed, #a78bfa);
+    color: #fff; border: none;
+    font-size: 18px; font-weight: bold; letter-spacing: 6px;
+    padding: 15px 52px; border-radius: 999px;
+    cursor: pointer;
+    box-shadow: 0 8px 30px rgba(124,58,237,0.5);
+    transition: 0.2s;
+    animation: breathe 2.2s ease-in-out infinite;
+  }
+  @keyframes breathe { 50% { box-shadow: 0 8px 44px rgba(124,58,237,0.85); } }
+  #btnStart:hover { transform: scale(1.06); }
+
+  /* ===== 结局结算页 ===== */
+  #ending {
+    position: fixed; inset: 0; z-index: 20;
+    background: radial-gradient(circle at 50% 30%, #1a1033 0%, #0a2b21 55%, #06110d 100%);
+    display: none;
+    flex-direction: column; justify-content: center; align-items: center;
+    text-align: center; gap: 12px;
+    animation: fadeInT 1s ease;
+  }
+  #ending.show { display: flex; }
+  #ending .end-kind { font-size: 15px; letter-spacing: 6px; color: #9fb8ac; }
+  #ending h1 {
+    font-size: clamp(30px, 6vw, 48px);
+    letter-spacing: 10px;
+    text-shadow: 0 0 26px rgba(124,58,237,0.7);
+  }
+  #ending .end-good { color: #34d399; }
+  #ending .end-normal { color: #c4b5fd; }
+  #ending .end-bad { color: #f87171; }
+  #ending .end-desc { max-width: 560px; font-size: 15px; line-height: 2; color: #d7e5dd; padding: 0 20px; }
+  #ending .end-stats {
+    display: flex; gap: 16px; font-size: 15px; color: #ffd97d;
+    margin-top: 6px;
+  }
+  #ending .end-rank { font-size: 18px; color: #a78bfa; letter-spacing: 3px; margin-top: 4px; }
+  #btnRestart {
+    margin-top: 18px;
+    background: transparent;
+    border: 2px solid #a78bfa;
+    color: #c4b5fd;
+    font-size: 16px; letter-spacing: 4px;
+    padding: 12px 44px; border-radius: 999px;
+    cursor: pointer; transition: 0.2s;
+  }
+  #btnRestart:hover { background: #a78bfa; color: #0a2b21; }
+
+  @media (max-width: 560px) {
+    .sprite { left: 4%; width: 170px; height: 240px; bottom: 175px; }
+    .sprite .head { width: 70px; height: 78px; }
+    .sprite .hair-front { width: 82px; }
+    .sprite .body { width: 126px; height: 150px; top: 84px; }
+    .sprite .eyes, .sprite .blush, .sp-teacher .glasses { transform: scale(0.8); }
+    #dlg { min-height: 130px; padding-bottom: 40px; }
+    #dlgText { font-size: 15px; }
+    #choices { bottom: 165px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ===== 开场界面 ===== -->
+<div id="title">
+  <div class="stars" id="stars"></div>
+  <h1>校园一日闯关</h1>
+  <div class="team">★ 星轨代码 ★</div>
+  <div class="intro">
+    你将扮演一名中侨学子，度过校园中平凡而不寻常的一天。<br>
+    与同学、学长、老师相遇，每一次选择都会增减<b style="color:#ffd97d">积分</b>，<br>
+    并把你带向完全不同的故事支线与结局。<br>
+    <span style="opacity:0.75">点击对话框推进剧情 · 空格键快进当前台词</span>
+  </div>
+  <button id="btnStart">开 始 游 戏</button>
+</div>
+
+<!-- ===== 舞台 ===== -->
+<div id="stage">
+  <div id="bg" class="bg-classroom"></div>
+  <div id="timeTag">清晨 · 教室</div>
+  <div id="stats">
+    <div class="stat-chip" id="chipSc">★ 积分 <span id="scText">0</span></div>
+  </div>
+
+  <!-- 虚拟人物立绘（按角色切换配色） -->
+  <div class="sprite hidden" id="sprite">
+    <div class="hair-side l"></div>
+    <div class="hair-side r"></div>
+    <div class="head"></div>
+    <div class="hair-front"></div>
+    <div class="eyes"><div class="eye"></div><div class="eye"></div></div>
+    <div class="blush l"></div><div class="blush r"></div>
+    <div class="mouth"></div>
+    <div class="glasses"><i></i><i></i></div>
+    <div class="body"></div>
+    <div class="collar"></div>
+    <div class="tie"></div>
+  </div>
+
+  <!-- 选项区 -->
+  <div id="choices"></div>
+
+  <!-- 对话框 -->
+  <div id="dlg">
+    <div id="nameTag">旁白</div>
+    <div id="dlgText"></div>
+    <div id="dlgHint">点击 / 空格 继续 ▸</div>
+  </div>
+</div>
+
+<!-- ===== 结局结算页 ===== -->
+<div id="ending">
+  <div class="end-kind">—— 结 局 达 成 ——</div>
+  <h1 id="endTitle"></h1>
+  <div class="end-desc" id="endDesc"></div>
+  <div class="end-stats" id="endScore" style="font-size:44px;color:#ffd97d;font-weight:bold;margin:6px 0">0</div>
+  <div style="color:#9fb8ac;font-size:14px;margin-top:-8px">最终积分</div>
+  <div class="end-rank" id="endRank"></div>
+  <button id="btnRestart">重新开始</button>
+</div>
+
+<script>
+/* =========================================================
+ * 校园一日闯关 · 视觉小说引擎（单文件 · 无依赖）
+ * 模块：节点剧本 → 打字机 → 立绘/背景切换 → 选项 → 结局判定
+ * ========================================================= */
+
+/* ---------------- 角色与配色 ---------------- */
+const CHARACTERS = {
+  xia:     { name: "小夏",   cls: "sp-xia" },
+  senpai:  { name: "陆屿",   cls: "sp-senpai" },
+  teacher: { name: "林老师", cls: "sp-teacher" },
+  narrator:{ name: "旁白",   cls: null }
+};
+
+/* ---------------- 剧本节点 ----------------
+   bg: classroom/corridor/library/canteen/playground
+   who: 说话角色 / sprite: 立绘角色（null 隐藏）
+   next: 下一节点 key（可为函数） / choices: 选项数组
+   ending 节点由 finish(kind) 处理 */
+const nodes = {
+
+  /* ===== 序幕 · 清晨教室 ===== */
+  intro: {
+    bg: "classroom", time: "清晨 · 教室", who: "旁白", sprite: null,
+    text: "清晨七点五十，晨光爬进教室的窗棂。\n今天是周一，也是AI创新竞赛报名的最后一天。\n你翻着书，隐约觉得，今天会有什么不一样的事发生。",
+    next: "t_meet"
+  },
+  t_meet: {
+    bg: "classroom", time: "清晨 · 教室", who: "林老师", sprite: "teacher",
+    text: "\"同学，来得正好。\"\n林老师抱着一摞资料走过来，扶了扶眼镜。\n\"下个月的AI创新竞赛，我第一个就想到你了。\"",
+    next: "t_choice"
+  },
+  t_choice: {
+    bg: "classroom", time: "清晨 · 教室", who: "林老师", sprite: "teacher",
+    text: "\"怎么样，有兴趣试试吗？这可是难得的机会。\"",
+    choices: [
+      { t: "\"我愿意试试！\"认真询问竞赛详情", sc: 10, route: "study", next: "t_after" },
+      { t: "\"我想先和朋友商量一下。\"", sc: 3, route: "open", next: "t_after2" },
+      { t: "低头假装整理书包，含糊过去", sc: -5, route: "lazy", next: "t_after3" }
+    ]
+  },
+  t_after: {
+    bg: "classroom", time: "清晨 · 教室", who: "林老师", sprite: "teacher",
+    text: "\"好！有魄力。\"\n林老师递给你一份报名表，眼里带着赞许。\n\"下午去图书馆找竞赛队的陆屿学长，他会带你熟悉流程。\"",
+    next: "x_meet"
+  },
+  t_after2: {
+    bg: "classroom", time: "清晨 · 教室", who: "林老师", sprite: "teacher",
+    text: "\"当然可以，不着急。\"\n林老师微笑着把宣传单放在你桌上。\n\"想好了随时来找我，机会是留给有准备的人的。\"",
+    next: "x_meet"
+  },
+  t_after3: {
+    bg: "classroom", time: "清晨 · 教室", who: "旁白", sprite: null,
+    text: "林老师欲言又止，最终摇摇头离开了。\n你盯着书包发呆，总觉得刚才错过了什么重要的东西。",
+    next: "x_meet"
+  },
+
+  /* ===== 同学 · 小夏登场 ===== */
+  x_meet: {
+    bg: "classroom", time: "清晨 · 教室", who: "小夏", sprite: "xia",
+    text: "\"呀——！\"\n邻座的紫色头发的女生惊呼一声，一支笔滚落到你脚边。\n\"抱歉抱歉，我的笔！\"",
+    next: "x_choice"
+  },
+  x_choice: {
+    bg: "classroom", time: "清晨 · 教室", who: "小夏", sprite: "xia",
+    text: "她微微歪头看着你，眼睛亮晶晶的。",
+    choices: [
+      { t: "帮她捡起笔，微笑着递还", sc: 5, next: "x_after1" },
+      { t: "用脚背一接，潇洒抛还给她", sc: 3, next: "x_after2" },
+      { t: "视而不见，继续想竞赛的事", sc: -2, next: "x_after3" }
+    ]
+  },
+  x_after1: {
+    bg: "classroom", time: "清晨 · 教室", who: "小夏", sprite: "xia",
+    text: "\"谢谢！我叫小夏，坐你旁边哒。\"\n她双手接过笔，弯起眼睛笑了。\n\"你的运气一定很好，我要跟你沾沾！\"",
+    next: "corridor"
+  },
+  x_after2: {
+    bg: "classroom", time: "清晨 · 教室", who: "小夏", sprite: "xia",
+    text: "\"哇——好帅！\"\n小夏接住笔，忍不住鼓掌。\n\"同学你这个身手，运动会不给班里出力可惜了啊！\"",
+    next: "corridor"
+  },
+  x_after3: {
+    bg: "classroom", time: "清晨 · 教室", who: "旁白", sprite: null,
+    text: "笔滚到墙角，小夏默默捡了回来。\n她欲言又止地看了你一眼，转过头去。\n教室里安静得有些尴尬。",
+    next: "corridor"
+  },
+
+  /* ===== 走廊 · 分支枢纽 ===== */
+  corridor: {
+    bg: "corridor", time: "上午 · 走廊", who: "旁白", sprite: null,
+    text: "第一节课的铃声响起又结束。\n走廊上人来人往，阳光把影子拉得很长。\n接下来的一段时间，你来到了——",
+    next: function () {
+      if (state.route === "study") return "lib1";
+      if (state.route === "open") return "can1";
+      return "lazy1";
+    }
+  },
+
+  /* ===== 支线一 · 学业线（图书馆 · 陆屿） ===== */
+  lib1: {
+    bg: "library", time: "上午 · 图书馆", who: "陆屿", sprite: "senpai",
+    text: "图书馆一角，青色头发的男生合上书，朝你点头。\n\"你就是林老师提到的那位同学？\"\n\"我叫陆屿，竞赛队学长。比赛的事，想问什么都可以。\"",
+    next: "lib_choice"
+  },
+  lib_choice: {
+    bg: "library", time: "上午 · 图书馆", who: "陆屿", sprite: "senpai",
+    text: "他推来一本《机器学习入门》，目光平静而认真。",
+    choices: [
+      { t: "\"学长，我想请教你竞赛的经验！\"", sc: 12, next: "lib_quiz" },
+      { t: "摆出很懂的样子，对AI侃侃而谈", sc: 3, next: "lib_pretend" }
+    ]
+  },
+  lib_quiz: {
+    bg: "library", time: "上午 · 图书馆", who: "陆屿", sprite: "senpai",
+    text: "\"哦？那我先考考你——\"\n陆屿十指交叠，缓缓开口：\n\"训练一个AI模型，最基础的东西是什么？\"",
+    choices: [
+      { t: "\"是数据和算力，巧妇难为无米之炊。\"", sc: 15, next: "lib_good" },
+      { t: "\"是运气，玄学调参，一键起飞。\"", sc: -3, next: "lib_mid" },
+      { t: "\"是氪金，充值使模型变强。\"", sc: -8, next: "lib_bad" }
+    ]
+  },
+  lib_good: {
+    bg: "library", time: "上午 · 图书馆", who: "陆屿", sprite: "senpai",
+    text: "\"……不错。\"\n陆屿难得地露出一丝笑意。\n\"基础扎实，态度也好。这本周刊借你，回去好好看。\"",
+    next: "lib_invite"
+  },
+  lib_mid: {
+    bg: "library", time: "上午 · 图书馆", who: "陆屿", sprite: "senpai",
+    text: "\"运气？\"\n陆屿挑了挑眉，不置可否。\n\"竞赛场上，运气只是锦上添花。回去把基础打牢吧。\"",
+    next: "lib_invite"
+  },
+  lib_bad: {
+    bg: "library", time: "上午 · 图书馆", who: "陆屿", sprite: "senpai",
+    text: "\"……\"\n空气安静了三秒。\n陆屿默默收回那本《机器学习入门》：\"看来你还需要一点时间。\"",
+    next: "lib_invite"
+  },
+  lib_pretend: {
+    bg: "library", time: "上午 · 图书馆", who: "旁白", sprite: null,
+    text: "你从「监督学习」讲到「矩阵乘法」，越说越飘。\n陆屿安静听完，只淡淡说了一句：\n\"梯度下降的那部分，你讲反了。\"",
+    next: "lib_invite"
+  },
+  lib_invite: {
+    bg: "library", time: "上午 · 图书馆", who: "陆屿", sprite: "senpai",
+    text: "\"对了——\"临走前他忽然回头，\n\"傍晚操场有天文社的观星活动，竞赛队的人都会去。\"\n\"来吧，认识一下大家。\"",
+    next: "lunch"
+  },
+
+  /* ===== 支线二 · 社交线（食堂 · 小夏） ===== */
+  can1: {
+    bg: "canteen", time: "中午 · 食堂", who: "小夏", sprite: "xia",
+    text: "中午的食堂人声鼎沸。\n小夏端着餐盘从人群里挤出来，眼前一亮：\n\"是你！快快快，帮我占个座，人太多了！\"",
+    next: "can_choice"
+  },
+  can_choice: {
+    bg: "canteen", time: "中午 · 食堂", who: "小夏", sprite: "xia",
+    text: "她把餐盘往你面前一放，动作行云流水，显然是常客。",
+    choices: [
+      { t: "和她拼桌，聊起竞赛和社团的事", sc: 8, next: "can_talk" },
+      { t: "把餐盘里最后一块排骨让给她", sc: 2, next: "can_food" },
+      { t: "低头刷手机，简单应付两句", sc: -2, next: "can_cold" }
+    ]
+  },
+  can_talk: {
+    bg: "canteen", time: "中午 · 食堂", who: "小夏", sprite: "xia",
+    text: "\"竞赛？我也想参加来着！\"\n小夏眼睛一下子亮了，扒饭的速度都快了。\n\"那说好了，以后互相督促，谁也别掉队！\"",
+    next: "can_invite"
+  },
+  can_food: {
+    bg: "canteen", time: "中午 · 食堂", who: "小夏", sprite: "xia",
+    text: "\"诶？！这可是最后一块排骨诶……\"\n她愣了一下，耳朵微微泛红。\n\"那、那我请你喝酸奶！不许拒绝！\"",
+    next: "can_invite"
+  },
+  can_cold: {
+    bg: "canteen", time: "中午 · 食堂", who: "旁白", sprite: null,
+    text: "小夏的笑意淡了下去。\n\"……你忙吧。\"\n她端起餐盘，换到了另一张桌子。",
+    next: "lunch"
+  },
+  can_invite: {
+    bg: "canteen", time: "中午 · 食堂", who: "小夏", sprite: "xia",
+    text: "\"对了对了，傍晚操场有观星活动！\"\n小夏比了个星星的手势，笑得眉眼弯弯。\n\"天文社办的，一起去嘛一起去嘛！\"",
+    next: "lunch"
+  },
+
+  /* ===== 支线三 · 摸鱼线 ===== */
+  lazy1: {
+    bg: "corridor", time: "上午 · 走廊", who: "旁白", sprite: null,
+    text: "你翘掉了所有的讨论，在天台的楼梯间吹了一上午的风。\n手机刷到发烫，报名截止的推送静静躺在通知栏里，\n像在无声地倒计时。",
+    choices: [
+      { t: "就这样躺平下去，摆烂到底", sc: -8, next: "lazy2" },
+      { t: "突然良心发现，追上林老师报名", sc: 10, next: "lib1" }
+    ]
+  },
+  lazy2: {
+    bg: "canteen", time: "中午 · 食堂", who: "旁白", sprite: null,
+    text: "中午的食堂，你随便对付了两口。\n窗外的天空很好看，可你总觉得这一天的画面里，\n少了一些人的身影。",
+    next: "dusk_lazy"
+  },
+
+  /* ===== 共通 · 午后过渡 ===== */
+  lunch: {
+    bg: "canteen", time: "午后 · 教室", who: "旁白", sprite: null,
+    text: "午后的课在粉笔声中慢慢流过。\n窗外的云被风推向黄昏的方向。\n一天不知不觉，来到了傍晚。",
+    next: "dusk"
+  },
+
+  /* ===== 黄昏 · 操场终章 ===== */
+  dusk: {
+    bg: "playground", time: "黄昏 · 操场", who: "旁白", sprite: null,
+    text: "黄昏的操场，落日把云染成紫色与橘色。\n草坪上支起了几台天文望远镜，人流三三两两。\n今天所有的相遇，都将在这里画上句点。",
+    next: "dusk_meet"
+  },
+  dusk_meet: {
+    bg: "playground", time: "黄昏 · 操场", who: "陆屿", sprite: "senpai",
+    text: "\"来了？\"\n陆屿站在望远镜旁朝你挥手，小夏在不远处朝你用力招手。\n\"观星马上开始——今晚天气很好，能看见土星环。\"",
+    next: "dusk_choice"
+  },
+  dusk_choice: {
+    bg: "playground", time: "黄昏 · 操场", who: "小夏", sprite: "xia",
+    text: "\"留下来看星星吧！\"\n小夏和陆屿同时看向你，夕阳把两个人的影子拉得很长。\n这一刻的选择，将决定你这一天会怎样结束。",
+    choices: [
+      { t: "留下来，和大家一起看星星", sc: 10, joined: true, next: "dusk_stay" },
+      { t: "摆摆手：\"下次一定。\"", sc: -5, joined: false, next: "dusk_leave" }
+    ]
+  },
+  dusk_stay: {
+    bg: "playground", time: "夜晚 · 操场", who: "旁白", sprite: null,
+    text: "夜幕落下，星轨在头顶缓缓旋转。\n陆屿讲着竞赛的规划，小夏指着最亮的那颗星喊你快看。\n镜头般的记忆里，这一天闪闪发光。",
+    ending: function () {
+      return state.sc >= 45 ? "good" : "normal";
+    }
+  },
+  dusk_leave: {
+    bg: "playground", time: "夜晚 · 操场", who: "旁白", sprite: null,
+    text: "你转身走出操场，身后传来隐约的欢笑声。\n夜风微凉。你回头看了一眼——\n星空很美，只是与你隔着一道围栏。",
+    ending: "bad"
+  },
+  dusk_lazy: {
+    bg: "playground", time: "夜晚 · 操场", who: "旁白", sprite: null,
+    text: "夜晚，你躺在床上刷完了最后一轮视频。\n报名通道关闭的提示弹出来，又被你随手划掉。\n这一天，就这样过去了。",
+    ending: "bad"
+  }
+};
+
+/* ---------------- 游戏状态 ---------------- */
+let state = null;
+
+/* ---------------- DOM ---------------- */
+const $ = id => document.getElementById(id);
+const el = {
+  bg: $("bg"), timeTag: $("timeTag"), sprite: $("sprite"),
+  dlg: $("dlg"), nameTag: $("nameTag"), dlgText: $("dlgText"),
+  choices: $("choices"), sc: $("scText"),
+  chipSc: $("chipSc"),
+  ending: $("ending")
+};
+
+/* ---------------- 音效（Web Audio 合成，无外部资源） ---------------- */
+let audioCtx = null;
+function beep(freq, dur, delay = 0, type = "sine") {
+  try {
+    audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+    const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+    o.type = type; o.frequency.value = freq;
+    g.gain.setValueAtTime(0.06, audioCtx.currentTime + delay);
+    g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + delay + dur);
+    o.connect(g); g.connect(audioCtx.destination);
+    o.start(audioCtx.currentTime + delay); o.stop(audioCtx.currentTime + delay + dur);
+  } catch (e) {}
+}
+const sfx = {
+  type:  () => beep(880 + Math.random() * 120, 0.02, 0, "triangle"),
+  click: () => beep(620, 0.08),
+  good:  () => { beep(523, 0.1); beep(784, 0.14, 0.09); },
+  bad:   () => { beep(300, 0.14, 0, "square"); beep(220, 0.2, 0.1, "square"); },
+  end:   () => [523, 659, 784, 659, 523, 784].forEach((f, i) => beep(f, 0.16, i * 0.14))
+};
+
+/* ---------------- 打字机 ---------------- */
+let typing = false, typeTimer = null, fullText = "", onTypeDone = null;
+
+function typeText(text, done) {
+  clearInterval(typeTimer);
+  fullText = text;
+  onTypeDone = done;
+  typing = true;
+  el.dlgText.textContent = "";
+  el.dlgText.appendChild(document.createElement("span"));
+  let i = 0;
+  typeTimer = setInterval(() => {
+    i++;
+    el.dlgText.firstChild.textContent = text.slice(0, i);
+    if (i % 3 === 0) sfx.type();
+    if (i >= text.length) finishType();
+  }, 28);
+}
+function finishType() {
+  clearInterval(typeTimer);
+  typing = false;
+  el.dlgText.firstChild.textContent = fullText;
+  const caret = document.createElement("span");
+  caret.id = "caret";
+  el.dlgText.appendChild(caret);
+  const cb = onTypeDone;
+  onTypeDone = null;
+  cb && cb();
+}
+function skipType() {
+  if (typing) finishType();
+}
+
+/* ---------------- 立绘与背景切换 ---------------- */
+function setSprite(key) {
+  if (!key) { el.sprite.classList.add("hidden"); return; }
+  const c = CHARACTERS[key];
+  /* 换角色时先淡出再淡入，避免瞬移 */
+  el.sprite.classList.add("hidden");
+  setTimeout(() => {
+    el.sprite.className = "sprite " + (c.cls || "");
+    el.sprite.classList.remove("hidden");
+  }, 200);
+}
+function setBg(name) {
+  if (el.bg.classList.contains("bg-" + name)) return;
+  el.bg.classList.add("fading");
+  setTimeout(() => {
+    el.bg.className = "bg-" + name;
+    el.bg.classList.remove("fading");
+  }, 420);
+}
+function setTime(tag) { el.timeTag.textContent = tag; }
+
+/* ---------------- 数值更新 ---------------- */
+function applyChange(sc) {
+  if (sc) state.sc += sc;
+  el.sc.textContent = state.sc;
+  [el.chipSc].forEach(c => {
+    c.classList.remove("bump");
+    void c.offsetWidth;
+    c.classList.add("bump");
+    setTimeout(() => c.classList.remove("bump"), 250);
+  });
+}
+
+/* ---------------- 节点渲染 ---------------- */
+function showNode(key) {
+  const node = nodes[key];
+  if (!node) return finish(state.lastEnding || "normal");
+
+  setBg(node.bg);
+  setTime(node.time || "");
+  setSprite(node.sprite || null);
+  el.nameTag.textContent = CHARACTERS[node.who] ? CHARACTERS[node.who].name : "旁白";
+  el.choices.innerHTML = "";
+
+  typeText(node.text, () => {
+    if (node.ending) {
+      /* 结局判定：积分达标的通关路线才是好结局，否则普通结局 */
+      const kind = typeof node.ending === "function" ? node.ending() : node.ending;
+      setTimeout(() => finish(kind), 900);
+      return;
+    }
+    if (node.choices) renderChoices(node);
+  });
+
+  /* 点击对话框推进 */
+  el.dlg.onclick = () => {
+    if (typing) { skipType(); return; }
+    if (node.ending || node.choices) return;   /* 结局/选项节点不点击跳转 */
+    sfx.click();
+    goNext(node);
+  };
+}
+
+function goNext(node) {
+  const nxt = typeof node.next === "function" ? node.next() : node.next;
+  if (!nxt) return finish(state.lastEnding || "normal");
+  showNode(nxt);
+}
+
+function renderChoices(node) {
+  node.choices.forEach((c, i) => {
+    const btn = document.createElement("button");
+    btn.className = "choice";
+    btn.style.animationDelay = (i * 0.1) + "s";
+    const fx = [];
+    if (c.sc) fx.push('<span class="fx ' + (c.sc > 0 ? "good" : "bad") + '">积分' + (c.sc > 0 ? "+" : "") + c.sc + "</span>");
+    btn.innerHTML = c.t + fx.join("");
+    btn.onclick = e => {
+      e.stopPropagation();
+      sfx[c.sc > 0 ? "good" : c.sc < 0 ? "bad" : "click"]();
+      applyChange(c.sc || 0);
+      if (c.route) state.route = c.route;
+      if (c.joined !== undefined) state.joined = c.joined;
+      el.choices.innerHTML = "";
+      goNext({ next: c.next });
+    };
+    el.choices.appendChild(btn);
+  });
+}
+
+/* ---------------- 结局判定与结算页 ---------------- */
+const ENDINGS = {
+  good: {
+    title: "星轨之夜",
+    cls: "end-good",
+    desc: "你留在了操场。望远镜里，土星环清晰得像一枚徽章。\n陆屿把竞赛报名表递给了你，小夏和你拉钩约定一起备赛。\n这一天，你在星空下找到了想走的路。"
+  },
+  normal: {
+    title: "平凡而温暖的一天",
+    cls: "end-normal",
+    desc: "你留下了，虽然话不多，但笑声是真实的。\n故事没有惊天动地的转折，可那份普通的温暖已经足够。\n明天，或许会有不一样的开始。"
+  },
+  bad: {
+    title: "错过的一天",
+    cls: "end-bad",
+    desc: "你在犹豫和敷衍中度过了一整天。\n报名截止了，观星的欢笑声与你无关。\n不过没关系——重新开始，一切都还来得及。"
+  }
+};
+
+function finish(kind) {
+  state.lastEnding = kind;
+  const E = ENDINGS[kind];
+  sfx.end();
+  el.ending.querySelector("h1").className = E.cls;
+  $("endTitle").textContent = "「 " + E.title + " 」";
+  $("endTitle").className = E.cls;
+  $("endDesc").textContent = E.desc;
+  $("endScore").textContent = state.sc;
+  /* 按最终积分评级（与文字闯关版一致的四档评价） */
+  let rank;
+  if (state.sc >= 60) rank = "最终评价：【 校园传说 · 星轨学霸 】";
+  else if (state.sc >= 45) rank = "最终评价：【 优秀中侨人 】";
+  else if (state.sc >= 25) rank = "最终评价：【 普通中侨人 】";
+  else rank = "最终评价：【 快乐摸鱼人 】";
+  $("endRank").textContent = rank;
+  el.ending.classList.add("show");
+}
+
+/* ---------------- 开场星空装饰 ---------------- */
+(function makeStars() {
+  const box = $("stars");
+  for (let i = 0; i < 60; i++) {
+    const s = document.createElement("i");
+    s.style.left = Math.random() * 100 + "%";
+    s.style.top = Math.random() * 100 + "%";
+    s.style.animationDelay = (Math.random() * 2.4) + "s";
+    box.appendChild(s);
+  }
+})();
+
+/* ---------------- 交互绑定 ---------------- */
+document.addEventListener("keydown", e => {
+  if (e.code === "Space") {
+    e.preventDefault();
+    if (!state || state.over) return;
+    if (typing) skipType();
+    else el.dlg.click();
+  }
+});
+$("btnStart").onclick = () => {
+  sfx.good();
+  $("title").style.display = "none";
+  startGame();
+};
+$("btnRestart").onclick = () => {
+  sfx.click();
+  el.ending.classList.remove("show");
+  startGame();
+};
+
+/* ---------------- 启动 / 重开 ---------------- */
+function startGame() {
+  state = { sc: 0, route: null, joined: null, over: false, lastEnding: null };
+  el.sc.textContent = 0;
+  showNode("intro");
+}
+
+/* 初始渲染舞台背景（标题背后） */
+state = { sc: 0, route: null, joined: null, over: false, lastEnding: null };
+setBg("playground");
+setTime("");
+</script>
+</body>
+</html>
